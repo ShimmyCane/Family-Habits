@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#ffd23f">
+    <title>Family Habits ✨</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Patrick+Hand&family=Quicksand:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ink: #2b2d42;
+            --paper: #fffdf5;
+            --sun: #ffd23f;
+            --pink: #ff6b9d;
+            --sky: #4cc9f0;
+            --mint: #6bd8a0;
+            --grape: #9b5de5;
+            --coral: #ff7b54;
+            --card-bg: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: "Quicksand", "Orbitron", sans-serif;
+            font-weight: 700;
+            color: var(--ink);
+            background-color: var(--paper);
+            background-image: radial-gradient(var(--sky) 2px, transparent 2.5px), radial-gradient(var(--pink) 2px, transparent 2.5px);
+            background-size: 44px 44px;
+            background-position: 0 0, 22px 22px;
+            margin: 0;
+            padding: 16px;
+            padding-left: max(16px, env(safe-area-inset-left));
+            padding-right: max(16px, env(safe-area-inset-right));
+            padding-bottom: max(32px, env(safe-area-inset-bottom));
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 680px;
+            margin: 0 auto;
+        }
+
+        /* Typography & Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            gap: 12px;
+        }
+
+        .app-title {
+            font-family: "Orbitron", sans-serif;
+            font-size: 22px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            background: var(--sun);
+            border: 3px solid var(--ink);
+            border-radius: 14px 36px 14px 36px;
+            padding: 6px 16px;
+            box-shadow: 4px 4px 0 var(--ink);
+            transform: rotate(-1.5deg);
+            display: inline-block;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.1s ease;
+        }
+
+        .app-title:active {
+            transform: translate(2px, 2px) rotate(-1.5deg);
+            box-shadow: 2px 2px 0 var(--ink);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        /* Tactile Buttons */
+        .btn {
+            font-family: "Quicksand", inherit;
+            font-weight: 700;
+            font-size: 16px;
+            background: var(--sky);
+            color: var(--ink);
+            border: 3px solid var(--ink);
+            border-radius: 14px 24px 14px 24px;
+            padding: 10px 18px;
+            min-height: 48px;
+            cursor: pointer;
+            box-shadow: 4px 4px 0 var(--ink);
+            transition: transform 0.08s ease, box-shadow 0.08s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            user-select: none;
+        }
+
+        .btn:active {
+            transform: translate(3px, 3px);
+            box-shadow: 1px 1px 0 var(--ink);
+        }
+
+        .btn-small {
+            min-height: 38px;
+            padding: 6px 12px;
+            font-size: 14px;
+            border-radius: 12px;
+            box-shadow: 3px 3px 0 var(--ink);
+        }
+
+        .btn-primary { background: var(--pink); color: #fff; text-shadow: 1px 1px 0 var(--ink); }
+        .btn-mint { background: var(--mint); }
+        .btn-sun { background: var(--sun); }
+        .btn-white { background: #fff; }
+        .btn-danger { background: #ff5252; color: #fff; }
+
+        /* Error Banner */
+        #error-banner {
+            display: none;
+            background: #ffe3e3;
+            color: #900;
+            border: 3px solid var(--ink);
+            border-radius: 14px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            box-shadow: 4px 4px 0 var(--ink);
+            font-size: 14px;
+        }
+
+        /* Diagnostics Panel */
+        #diag-panel {
+            display: none;
+            background: #fff;
+            border: 3px solid var(--ink);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 18px;
+            box-shadow: 4px 4px 0 var(--ink);
+        }
+
+        .diag-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 2px dashed #ddd;
+            font-size: 14px;
+        }
+        .diag-item:last-child { border-bottom: none; }
+        .diag-status-ok { color: #2e7d32; font-weight: 800; }
+        .diag-status-fail { color: #d32f2f; font-weight: 800; }
+
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            border: 3px solid var(--ink);
+            border-radius: 20px 10px 22px 12px / 12px 22px 10px 20px;
+            box-shadow: 5px 5px 0 var(--ink);
+            padding: 18px;
+            margin-bottom: 18px;
+        }
+
+        /* Front Page / Home Dashboard */
+        .hero-banner {
+            background: var(--sun);
+            border: 3px solid var(--ink);
+            border-radius: 24px 12px 24px 12px;
+            box-shadow: 5px 5px 0 var(--ink);
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .hero-title {
+            font-size: 24px;
+            margin: 0 0 6px;
+            text-transform: uppercase;
+        }
+
+        .hero-desc {
+            font-family: "Patrick Hand", cursive;
+            font-size: 18px;
+            color: #444;
+            margin: 0 0 16px;
+        }
+
+        .meeting-hero-btn {
+            background: var(--pink);
+            color: #fff;
+            font-size: 19px;
+            padding: 14px 24px;
+            width: 100%;
+            border-radius: 18px 30px 18px 30px;
+            text-shadow: 1px 1px 0 var(--ink);
+        }
+
+        .home-actions-bar {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .home-actions-bar .btn {
+            flex: 1;
+        }
+
+        .family-summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        .family-member-card {
+            background: #fff;
+            border: 3px solid var(--ink);
+            border-radius: 20px;
+            padding: 16px;
+            box-shadow: 4px 4px 0 var(--ink);
+            cursor: pointer;
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            position: relative;
+        }
+
+        .family-member-card:active {
+            transform: translate(3px, 3px);
+            box-shadow: 1px 1px 0 var(--ink);
+        }
+
+        .family-member-card .card-avatar {
+            font-size: 44px;
+            margin-bottom: 6px;
+            filter: drop-shadow(2px 2px 0 var(--ink));
+        }
+
+        .family-member-card .card-name {
+            font-size: 18px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .badge-chips {
+            display: flex;
+            gap: 4px;
+            margin-top: 6px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .badge-chip {
+            font-size: 11px;
+            font-weight: 800;
+            background: #fff3b0;
+            border: 1.5px solid var(--ink);
+            border-radius: 8px;
+            padding: 1px 6px;
+            text-transform: uppercase;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            background: #eee;
+            border: 2px solid var(--ink);
+            border-radius: 10px;
+            height: 14px;
+            margin: 10px 0 6px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--mint);
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        .card-stat-text {
+            font-size: 13px;
+            font-weight: 800;
+            color: #555;
+        }
+
+        /* Member Picker Tabs */
+        .member-picker {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .member-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 12px 4px;
+            min-height: 84px;
+            border: 3px solid var(--ink);
+            border-radius: 16px 24px 16px 24px;
+            box-shadow: 4px 4px 0 var(--ink);
+            cursor: pointer;
+            background: #fff;
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+
+        .member-btn .avatar {
+            font-size: 32px;
+            line-height: 1;
+            filter: drop-shadow(2px 2px 0 var(--ink));
+        }
+
+        .member-btn .name {
+            font-size: 15px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .member-btn.active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 var(--ink);
+            border-width: 4px;
+        }
+
+        /* Member Banner */
+        .member-banner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            border: 3px solid var(--ink);
+            border-radius: 16px;
+            margin-bottom: 16px;
+            box-shadow: 4px 4px 0 var(--ink);
+        }
+
+        .member-banner-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .member-banner-left .avatar { font-size: 40px; }
+        .member-banner-left h2 { margin: 0; font-size: 22px; text-transform: uppercase; }
+        .member-banner-left .sub { font-family: "Patrick Hand", cursive; font-size: 16px; color: #444; }
+
+        /* Week Navigation */
+        .week-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+            border: 3px solid var(--ink);
+            border-radius: 14px;
+            padding: 8px 14px;
+            margin-bottom: 16px;
+            box-shadow: 4px 4px 0 var(--ink);
+        }
+
+        .week-days {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+
+        .day-col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 8px 2px;
+            background: #fff;
+            border: 2px solid var(--ink);
+            border-radius: 12px;
+            box-shadow: 2px 2px 0 var(--ink);
+            font-size: 12px;
+        }
+
+        .day-col.today {
+            background: var(--sun);
+            border-width: 3px;
+            font-weight: 900;
+            transform: scale(1.05);
+        }
+
+        .day-col .day-name { text-transform: uppercase; font-size: 11px; }
+        .day-col .day-date { font-size: 14px; font-weight: 800; margin-top: 2px; }
+
+        /* Section Titles */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 20px 0 10px;
+        }
+
+        .section-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 16px;
+            font-weight: 800;
+            text-transform: uppercase;
+            padding: 6px 14px;
+            border: 2px solid var(--ink);
+            border-radius: 20px 8px 20px 8px;
+            box-shadow: 3px 3px 0 var(--ink);
+        }
+
+        .badge-chores { background: var(--mint); transform: rotate(-1deg); }
+        .badge-goals { background: var(--pink); color: #fff; transform: rotate(1deg); }
+
+        /* Habit Row Item */
+        .habit-card {
+            background: #fff;
+            border: 3px solid var(--ink);
+            border-radius: 16px;
+            padding: 14px 16px;
+            margin-bottom: 12px;
+            box-shadow: 4px 4px 0 var(--ink);
+            position: relative;
+        }
+
+        .habit-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .habit-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .habit-emoji {
+            font-size: 32px;
+            line-height: 1;
+            filter: drop-shadow(2px 2px 0 var(--ink));
+        }
+
+        .habit-title { font-size: 18px; font-weight: 800; }
+        .habit-desc { font-family: "Patrick Hand", cursive; font-size: 15px; color: #666; margin-top: 2px; }
+
+        .habit-actions-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .streak-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 13px;
+            font-weight: 800;
+            background: #fff3b0;
+            border: 2px solid var(--ink);
+            border-radius: 12px;
+            padding: 2px 8px;
+        }
+
+        .icon-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 4px;
+            line-height: 1;
+            opacity: 0.65;
+            transition: opacity 0.1s ease, transform 0.1s ease;
+        }
+
+        .icon-btn:hover { opacity: 1; transform: scale(1.15); }
+
+        /* 7-Day Completion Bubbles */
+        .habit-check-row {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+        }
+
+        .check-bubble {
+            aspect-ratio: 1;
+            max-height: 48px;
+            border: 2px solid var(--ink);
+            border-radius: 12px;
+            background: #f7f7f7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            cursor: pointer;
+            box-shadow: 2px 2px 0 var(--ink);
+            transition: transform 0.08s ease, background-color 0.15s ease;
+            user-select: none;
+        }
+
+        .check-bubble:active {
+            transform: translate(2px, 2px);
+            box-shadow: 0 0 0 var(--ink);
+        }
+
+        .check-bubble.checked {
+            background: var(--mint);
+        }
+
+        .check-bubble.goal-checked {
+            background: var(--sun);
+        }
+
+        /* Affirmation Popover */
+        #cheer-toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--sun);
+            border: 3px solid var(--ink);
+            border-radius: 20px 40px 20px 40px;
+            box-shadow: 5px 5px 0 var(--ink);
+            padding: 12px 24px;
+            font-size: 18px;
+            font-weight: 800;
+            text-align: center;
+            z-index: 999;
+            pointer-events: none;
+            opacity: 0;
+            transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28), opacity 0.3s ease;
+        }
+
+        #cheer-toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        /* Celebration Reel & Sunday Meeting */
+        #meeting-view {
+            display: none;
+        }
+
+        .reel-card {
+            background: #fff;
+            border: 4px solid var(--ink);
+            border-radius: 28px;
+            box-shadow: 6px 6px 0 var(--ink);
+            padding: 24px;
+            text-align: center;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .reel-avatar {
+            font-size: 72px;
+            filter: drop-shadow(3px 3px 0 var(--ink));
+            margin-bottom: 8px;
+        }
+
+        .reel-name {
+            font-size: 28px;
+            font-weight: 800;
+            text-transform: uppercase;
+            margin: 0 0 4px;
+        }
+
+        .reel-stats-box {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: 18px 0;
+        }
+
+        .reel-stat {
+            background: var(--paper);
+            border: 2px solid var(--ink);
+            border-radius: 14px;
+            padding: 12px;
+        }
+
+        .reel-stat-num {
+            font-size: 28px;
+            font-weight: 800;
+        }
+
+        .reel-stat-label {
+            font-size: 13px;
+            text-transform: uppercase;
+            color: #666;
+        }
+
+        .reel-praise {
+            font-family: "Patrick Hand", cursive;
+            font-size: 22px;
+            color: #333;
+            margin: 14px 0 18px;
+            min-height: 48px;
+        }
+
+        .reel-timer-bar {
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid var(--ink);
+            margin-bottom: 16px;
+        }
+
+        .reel-timer-fill {
+            height: 100%;
+            background: var(--pink);
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        /* Comparison Board */
+        .comparison-board {
+            display: none;
+        }
+
+        .leaderboard-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            background: #fff;
+            border: 3px solid var(--ink);
+            border-radius: 16px;
+            margin-bottom: 12px;
+            box-shadow: 3px 3px 0 var(--ink);
+        }
+
+        .leaderboard-avatar { font-size: 32px; }
+        .leaderboard-info { flex: 1; }
+        .leaderboard-name { font-size: 16px; font-weight: 800; }
+        .leaderboard-bar-bg {
+            background: #eee;
+            border: 2px solid var(--ink);
+            border-radius: 8px;
+            height: 12px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+        .leaderboard-bar-fill {
+            height: 100%;
+            background: var(--mint);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        .leaderboard-rate { font-size: 18px; font-weight: 800; }
+
+        /* Modals & Forms */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(43, 45, 66, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .modal-content {
+            background: #fff;
+            border: 3px solid var(--ink);
+            border-radius: 24px;
+            box-shadow: 6px 6px 0 var(--ink);
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        input, select, textarea {
+            font-family: inherit;
+            font-size: 16px;
+            font-weight: 700;
+            width: 100%;
+            padding: 12px 14px;
+            margin: 6px 0 14px;
+            border: 3px solid var(--ink);
+            border-radius: 12px 16px 12px 16px;
+            background: var(--paper);
+            color: var(--ink);
+        }
+
+        label {
+            font-size: 14px;
+            text-transform: uppercase;
+            font-weight: 800;
+        }
+
+        /* Avatar Picker Grid */
+        .avatar-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .avatar-option {
+            font-size: 26px;
+            padding: 8px 4px;
+            background: #fff;
+            border: 2px solid var(--ink);
+            border-radius: 12px;
+            cursor: pointer;
+            text-align: center;
+            user-select: none;
+            box-shadow: 2px 2px 0 var(--ink);
+        }
+
+        .avatar-option.selected {
+            background: var(--sun);
+            border-width: 3px;
+            transform: scale(1.05);
+        }
+
+        /* Color Swatches */
+        .color-swatches {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .color-swatch {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 3px solid var(--ink);
+            cursor: pointer;
+            box-shadow: 2px 2px 0 var(--ink);
+        }
+
+        .color-swatch.selected {
+            transform: scale(1.15);
+            outline: 3px solid var(--pink);
+        }
+
+        /* Floating Settings Gear */
+        .floating-gear {
+            position: fixed;
+            bottom: max(16px, env(safe-area-inset-bottom));
+            right: max(16px, env(safe-area-inset-right));
+            background: #fff;
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            border: 3px solid var(--ink);
+            box-shadow: 4px 4px 0 var(--ink);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            cursor: pointer;
+            z-index: 90;
+            transition: transform 0.1s ease;
+        }
+
+        .floating-gear:active {
+            transform: translate(3px, 3px);
+            box-shadow: 1px 1px 0 var(--ink);
+        }
+
+        /* Print Container (Fridge Chart 8.5x11) */
+        #printable-chart {
+            display: none;
+        }
+
+        @media print {
+            @page {
+                size: letter portrait;
+                margin: 0.4in;
+            }
+            body {
+                background: #fff !important;
+                background-image: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                color: #000 !important;
+            }
+            .container, .floating-gear, #cheer-toast, .modal-overlay {
+                display: none !important;
+            }
+            #printable-chart {
+                display: block !important;
+                width: 100%;
+                font-family: Arial, Helvetica, sans-serif;
+            }
+            .print-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 12px;
+            }
+            .print-table th, .print-table td {
+                border: 2px solid #000;
+                padding: 6px 8px;
+                text-align: left;
+                font-size: 12px;
+            }
+            .print-table th {
+                background-color: #f0f0f0;
+                text-align: center;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            .print-bubble {
+                width: 20px;
+                height: 20px;
+                border: 1.5px solid #000;
+                border-radius: 50%;
+                margin: 0 auto;
+            }
+            .print-member-header {
+                background: #e2e2e2 !important;
+                font-weight: bold;
+                font-size: 14px;
+                padding: 6px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="app">
+        <!-- Header -->
+        <header>
+            <div class="app-title" id="home-nav-title" title="Go to Front Page">✨ Family Habits</div>
+            <div class="header-actions">
+                <button id="header-print-btn" class="btn btn-small btn-white" title="Print Refrigerator Chart">🖨️ Fridge Chart</button>
+                <button id="auth-btn" class="btn btn-small btn-white">Login</button>
+            </div>
+        </header>
+
+        <!-- On-screen Error Banner -->
+        <div id="error-banner"></div>
+
+        <!-- Database Diagnostics Panel (Opened from Settings) -->
+        <div id="diag-panel">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h3 style="margin:0;font-size:16px;text-transform:uppercase;">🩺 Supabase Diagnostics</h3>
+                <button id="close-diag-btn" class="btn btn-small btn-white" style="min-height:30px;padding:2px 8px;">✕ Close</button>
+            </div>
+            <div id="diag-list">
+                <div class="diag-item"><span>Supabase Client</span><span id="diag-client" class="diag-status-ok">Initialized</span></div>
+                <div class="diag-item"><span>Authentication Status</span><span id="diag-auth">Checking...</span></div>
+                <div class="diag-item"><span>Table: family_members</span><span id="diag-members">Checking...</span></div>
+                <div class="diag-item"><span>Table: habits</span><span id="diag-habits">Checking...</span></div>
+                <div class="diag-item"><span>Table: habit_completions</span><span id="diag-completions">Checking...</span></div>
+                <div class="diag-item"><span>Table: family_reflections</span><span id="diag-reflections">Checking...</span></div>
+            </div>
+            <div id="diag-sql-hint" style="margin-top:12px;font-size:13px;background:var(--paper);border:2px dashed var(--ink);padding:10px;border-radius:10px;display:none;">
+                💡 <strong>Need to initialize tables?</strong> Open the Supabase dashboard and run the script in <code>03 Projects/Family Habits/supabase/schema.sql</code>.
+            </div>
+        </div>
+
+        <!-- Login Card (Shown when logged out) -->
+        <div id="login-card" class="card" style="display:none; text-align:center;">
+            <div style="font-size:48px;margin-bottom:8px;">🏠</div>
+            <h2 style="margin:0 0 6px;">Welcome Family!</h2>
+            <p style="font-family:'Patrick Hand',cursive;font-size:18px;margin:0 0 16px;color:#555;">Sign in to view and track our weekly habits & goals.</p>
+            <form id="login-form" style="text-align:left;">
+                <label for="login-email">Email</label>
+                <input type="email" id="login-email" value="wiggleling@gmail.com" required autocomplete="email">
+                <label for="login-password">Password</label>
+                <input type="password" id="login-password" placeholder="Password (hint: our cat)" required autocomplete="current-password">
+                <button type="submit" id="submit-login-btn" class="btn btn-primary" style="width:100%;margin-top:8px;">🚀 Sign In</button>
+            </form>
+        </div>
+
+        <!-- VIEW 1: FRONT PAGE / HOME DASHBOARD -->
+        <div id="home-view">
+            <div class="hero-banner">
+                <div style="font-size:40px;margin-bottom:6px;">🏡✨</div>
+                <h1 class="hero-title">Family Habits Hub</h1>
+                <p class="hero-desc">Building great routines, supporting each other, and having fun together!</p>
+                <button id="start-meeting-btn" class="btn meeting-hero-btn">🎉 Start Sunday Progress Check</button>
+                <div class="home-actions-bar">
+                    <button id="home-archive-btn" class="btn btn-small btn-white">📅 Past Weeks Archive</button>
+                    <button id="home-bank-btn" class="btn btn-small btn-white">📁 Task Bank</button>
+                    <button id="home-print-btn" class="btn btn-small btn-white">🖨️ Print Fridge Chart</button>
+                </div>
+            </div>
+
+            <div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 12px;">
+                <h3 style="margin:0;font-size:16px;text-transform:uppercase;">Family Weekly Snapshot</h3>
+                <span id="home-week-label" style="font-size:13px;color:#666;">This Week</span>
+            </div>
+
+            <div class="family-summary-grid" id="home-summary-grid">
+                <!-- Dynamically populated with Athena, Felix, Ying, Jimmy cards -->
+            </div>
+        </div>
+
+        <!-- VIEW 2: INDIVIDUAL MEMBER TRACKER VIEW -->
+        <div id="member-view" style="display:none;">
+            <!-- Family Member Picker -->
+            <div class="member-picker" id="member-picker">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- Active Member Banner -->
+            <div class="member-banner" id="member-banner" style="background:var(--sun);">
+                <div class="member-banner-left">
+                    <span class="avatar" id="banner-avatar">🦄</span>
+                    <div>
+                        <h2 id="banner-name">Athena</h2>
+                        <div class="sub" id="banner-sub">Weekly habits & goals</div>
+                        <div class="badge-chips" id="banner-badges"></div>
+                    </div>
+                </div>
+                <div style="display:flex;gap:6px;">
+                    <button id="home-return-btn" class="btn btn-small btn-white">🏠 Home</button>
+                    <button id="member-bank-btn" class="btn btn-small btn-white">📁 Bank</button>
+                    <button id="add-habit-btn" class="btn btn-small btn-white">➕ Add Task</button>
+                </div>
+            </div>
+
+            <!-- Week Bar -->
+            <div class="week-bar">
+                <button id="prev-week-btn" class="btn btn-small btn-white">&larr;</button>
+                <span id="week-label" style="font-size:15px;text-transform:uppercase;">This Week</span>
+                <button id="next-week-btn" class="btn btn-small btn-white">&rarr;</button>
+            </div>
+
+            <!-- Week Day Headers -->
+            <div class="week-days" id="week-days-header">
+                <!-- Populated via JS: Mon Tue Wed Thu Fri Sat Sun -->
+            </div>
+
+            <!-- Chores Section -->
+            <div class="section-header">
+                <span class="section-badge badge-chores">🧹 Weekly Chores</span>
+                <span id="chores-count" style="font-size:14px;color:#666;"></span>
+            </div>
+            <div id="chores-list">
+                <!-- Habit rows -->
+            </div>
+
+            <!-- Aspirational Goals Section -->
+            <div class="section-header" style="margin-top:28px;">
+                <span class="section-badge badge-goals">🎯 Aspirational Goals</span>
+                <span id="goals-count" style="font-size:14px;color:#666;"></span>
+            </div>
+            <div id="goals-list">
+                <!-- Goal rows -->
+            </div>
+        </div>
+
+        <!-- VIEW 3: SUNDAY MEETING & CELEBRATION REEL -->
+        <div id="meeting-view">
+            <!-- Stage 1: Celebration Reel -->
+            <div id="reel-container">
+                <div class="reel-card" id="reel-card">
+                    <div class="reel-avatar" id="reel-avatar">🦄</div>
+                    <h2 class="reel-name" id="reel-name">Athena</h2>
+                    <div class="reel-praise" id="reel-praise">"Outstanding effort this week!"</div>
+
+                    <div class="reel-stats-box">
+                        <div class="reel-stat">
+                            <div class="reel-stat-num" id="reel-chores-stat" style="color:var(--mint);">7/7</div>
+                            <div class="reel-stat-label">Chores Done</div>
+                        </div>
+                        <div class="reel-stat">
+                            <div class="reel-stat-num" id="reel-goals-stat" style="color:var(--coral);">5/5</div>
+                            <div class="reel-stat-label">Goals Done</div>
+                        </div>
+                    </div>
+
+                    <div class="reel-timer-bar">
+                        <div class="reel-timer-fill" id="reel-timer-fill"></div>
+                    </div>
+
+                    <div style="display:flex;justify-content:center;gap:12px;">
+                        <button id="reel-pause-btn" class="btn btn-small btn-white">⏸️ Pause</button>
+                        <button id="reel-next-btn" class="btn btn-small btn-primary">Next Person ⏭️</button>
+                        <button id="reel-skip-all-btn" class="btn btn-small btn-white">View Full Dashboard</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stage 2: Family Comparison & Full Breakdown -->
+            <div class="comparison-board card" id="comparison-board">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <h2 style="margin:0;font-size:20px;text-transform:uppercase;">🏆 Weekly Leaderboard</h2>
+                    <button id="exit-meeting-btn" class="btn btn-small btn-primary">✓ Finish Meeting</button>
+                </div>
+                <p style="font-family:'Patrick Hand',cursive;font-size:17px;color:#555;margin:0 0 16px;">Friendly family comparison & goal completion rates for this week:</p>
+
+                <div id="leaderboard-list">
+                    <!-- Leaderboard rows -->
+                </div>
+
+                <!-- Weekly Family Reflection & Wins Journal -->
+                <div class="card" style="margin-top:20px;background:#fffdf0;box-shadow:3px 3px 0 var(--ink);">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                        <span style="font-size:24px;">📝</span>
+                        <h3 style="margin:0;font-size:16px;text-transform:uppercase;">Family Win & Reflection of the Week</h3>
+                    </div>
+                    <p style="font-family:'Patrick Hand',cursive;font-size:16px;color:#555;margin:0 0 10px;">A short journal entry of our family's weekly celebrations and reflections.</p>
+                    <textarea id="weekly-reflection-input" rows="3" placeholder="e.g. Athena read 5 days in a row! Felix helped set the table without being asked. Great teamwork this week!"></textarea>
+                    <div style="display:flex;justify-content:flex-end;">
+                        <button id="save-reflection-btn" class="btn btn-small btn-primary">💾 Save Reflection</button>
+                    </div>
+                </div>
+
+                <h3 style="margin:24px 0 12px;font-size:16px;text-transform:uppercase;">📋 Individual Goal & Chore Breakdown</h3>
+                <div id="breakdown-list">
+                    <!-- Detailed cards for each member -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Floating Settings Gear Button -->
+        <div class="floating-gear" id="floating-gear-btn" title="Settings">⚙️</div>
+
+        <!-- Add / Edit Habit Modal -->
+        <div class="modal-overlay" id="add-modal">
+            <div class="modal-content">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                    <h2 id="task-modal-title" style="margin:0;font-size:20px;text-transform:uppercase;">✨ Add Chore / Goal</h2>
+                    <button id="close-add-modal" class="btn btn-small btn-white" style="min-height:30px;padding:2px 8px;">✕</button>
+                </div>
+                <button type="button" id="open-bank-from-add-btn" class="btn btn-small btn-white" style="width:100%;margin-bottom:12px;">📁 Browse Working Folder / Task Bank</button>
+                <form id="new-habit-form">
+                    <input type="hidden" id="edit-habit-id" value="">
+
+                    <label for="habit-member">Family Member</label>
+                    <select id="habit-member">
+                        <option value="Athena">Athena 🦄</option>
+                        <option value="Felix">Felix 🦊</option>
+                        <option value="Ying">Ying 🌸</option>
+                        <option value="Jimmy">Jimmy ☕</option>
+                    </select>
+
+                    <label for="habit-type">Type</label>
+                    <select id="habit-type">
+                        <option value="chore">🧹 Chore (Routine / Responsibility)</option>
+                        <option value="goal">🎯 Goal (Aspirational / Habit)</option>
+                    </select>
+
+                    <label for="habit-name">Name</label>
+                    <input type="text" id="habit-name" placeholder="e.g. Read 20 mins, Brush teeth" required>
+
+                    <label for="habit-emoji">Emoji Symbol</label>
+                    <input type="text" id="habit-emoji" value="⭐" maxlength="4" required>
+
+                    <label for="habit-desc">Description (Optional)</label>
+                    <input type="text" id="habit-desc" placeholder="Helpful details or motivation">
+
+                    <label for="habit-freq">Goal Frequency</label>
+                    <select id="habit-freq">
+                        <option value="daily">Daily (7 days / week)</option>
+                        <option value="x_days_week">X days per week</option>
+                        <option value="x_days_month">X days per month</option>
+                    </select>
+
+                    <label for="habit-target">Target Count</label>
+                    <input type="number" id="habit-target" min="1" max="31" value="7" required>
+
+                    <button type="submit" id="task-modal-submit" class="btn btn-primary" style="width:100%;margin-top:12px;">Save Task ✨</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Delete / Archive Confirmation Modal -->
+        <div class="modal-overlay" id="delete-modal">
+            <div class="modal-content" style="text-align:center;">
+                <div style="font-size:48px;margin-bottom:8px;">📦</div>
+                <h2 style="margin:0 0 10px;text-transform:uppercase;">Remove Task?</h2>
+                <p id="delete-task-msg" style="font-family:'Patrick Hand',cursive;font-size:18px;color:#444;margin:0 0 16px;">
+                    Remove this task?
+                </p>
+                <p style="font-size:13px;color:#666;margin:0 0 20px;">
+                    Moving it to your <strong>📁 Working Folder / Task Bank</strong> keeps it safe so you can reassign it to anyone anytime.
+                </p>
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                    <button id="confirm-archive-btn" class="btn btn-mint" style="width:100%;">📦 Move to Working Folder (Keep in Bank)</button>
+                    <div style="display:flex;gap:10px;">
+                        <button id="cancel-delete-btn" class="btn btn-white" style="flex:1;">Cancel</button>
+                        <button id="confirm-delete-btn" class="btn btn-danger" style="flex:1;font-size:14px;">🗑️ Delete Forever</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Task Bank / Shared Family Catalog Modal -->
+        <div class="modal-overlay" id="bank-modal">
+            <div class="modal-content" style="max-width: 540px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <h2 style="margin:0;font-size:20px;text-transform:uppercase;">📁 Family Task Bank</h2>
+                    <button id="close-bank-modal" class="btn btn-small btn-white" style="min-height:30px;padding:2px 8px;">✕</button>
+                </div>
+                <p style="font-family:'Patrick Hand',cursive;font-size:16px;color:#555;margin:0 0 12px;">
+                    All family tasks live in this shared bank and carry over indefinitely. The most popular tasks rise to the top! The bank never depletes.
+                </p>
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <input type="text" id="bank-search-input" placeholder="🔍 Search habits & chores..." style="margin:0;padding:8px 12px;font-size:14px;flex:1;">
+                    <button id="bank-add-new-btn" class="btn btn-small btn-mint" style="white-space:nowrap;">➕ New Task</button>
+                </div>
+                <div id="bank-list" style="max-height:55vh;overflow-y:auto;padding-right:2px;">
+                    <!-- Populated dynamically with sorted tasks -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Past Weeks Archive Modal -->
+        <div class="modal-overlay" id="archive-modal">
+            <div class="modal-content">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                    <h2 style="margin:0;font-size:20px;text-transform:uppercase;">📅 Past Weeks Archive</h2>
+                    <button id="close-archive-modal" class="btn btn-small btn-white" style="min-height:30px;padding:2px 8px;">✕</button>
+                </div>
+                <div id="archive-list" style="max-height:65vh;overflow-y:auto;">
+                    <!-- Past week summary rows & reflections -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div class="modal-overlay" id="settings-modal">
+            <div class="modal-content">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                    <h2 style="margin:0;font-size:20px;text-transform:uppercase;">⚙️ Settings</h2>
+                    <button id="close-settings-modal" class="btn btn-small btn-white" style="min-height:30px;padding:2px 8px;">✕</button>
+                </div>
+                <div style="font-size:15px;line-height:1.5;">
+                    <!-- Profile Customization -->
+                    <div style="background:var(--paper);border:2px solid var(--ink);border-radius:16px;padding:12px;margin-bottom:16px;">
+                        <h4 style="margin:0 0 8px;text-transform:uppercase;font-size:14px;">🎨 Customize Profiles</h4>
+                        <label for="settings-profile-member" style="font-size:12px;">Select Family Member</label>
+                        <select id="settings-profile-member" style="padding:8px;margin-bottom:8px;">
+                            <option value="Athena">Athena</option>
+                            <option value="Felix">Felix</option>
+                            <option value="Ying">Ying</option>
+                            <option value="Jimmy">Jimmy</option>
+                        </select>
+                        <label style="font-size:12px;display:block;margin-bottom:4px;">Pick Avatar Emoji</label>
+                        <div class="avatar-grid" id="avatar-grid">
+                            <!-- Populated with fun avatar choices -->
+                        </div>
+                        <label style="font-size:12px;display:block;margin-bottom:4px;">Pick Color</label>
+                        <div class="color-swatches" id="color-swatches">
+                            <!-- Populated with color dots -->
+                        </div>
+                        <button id="save-profile-btn" class="btn btn-small btn-mint" style="width:100%;">Save Profile ✨</button>
+                    </div>
+
+                    <!-- Streak Grace Period -->
+                    <div style="background:var(--paper);border:2px solid var(--ink);border-radius:16px;padding:12px;margin-bottom:16px;">
+                        <h4 style="margin:0 0 4px;text-transform:uppercase;font-size:14px;">🔥 Streak Grace Period</h4>
+                        <p style="font-size:12px;color:#555;margin:0 0 8px;">How many days a habit can be missed before the streak resets.</p>
+                        <select id="grace-period-select" style="padding:8px;margin-bottom:4px;">
+                            <option value="7">1 Week (7 days)</option>
+                            <option value="14" selected>2 Weeks (14 days - Recommended)</option>
+                            <option value="21">3 Weeks (21 days)</option>
+                            <option value="0">Strict (0 days / Immediate reset)</option>
+                        </select>
+                    </div>
+
+                    <!-- Actions -->
+                    <div style="display:flex;flex-direction:column;gap:8px;">
+                        <button id="toggle-sound-btn" class="btn btn-white" style="width:100%;justify-content:flex-start;">🔊 Sound Effects: ON</button>
+                        <button id="settings-bank-btn" class="btn btn-white" style="width:100%;justify-content:flex-start;">📁 Task Bank & Working Folder</button>
+                        <button id="export-json-btn" class="btn btn-white" style="width:100%;justify-content:flex-start;">💾 Download All Data (JSON)</button>
+                        <button id="settings-diag-btn" class="btn btn-white" style="width:100%;justify-content:flex-start;">🩺 Run Database Diagnostics</button>
+                        <button id="signout-btn" class="btn btn-primary" style="width:100%;">Sign Out</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Affirmation Toast -->
+        <div id="cheer-toast">🌟 Awesome job!</div>
+    </div>
+
+    <!-- Refrigerator Printable View (Formatted for 8.5" x 11" Paper) -->
+    <div id="printable-chart">
+        <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:12px;">
+            <h1 style="font-size:22px;margin:0;text-transform:uppercase;">🏡 Family Habits Weekly Chart</h1>
+            <p style="font-size:13px;margin:4px 0 0;color:#333;" id="print-date-range">Week of: ____________________ to ____________________</p>
+        </div>
+
+        <table class="print-table" id="print-table-content">
+            <!-- Dynamically populated with all 4 family members, chores, goals, and checkboxes for Mon-Sun -->
+        </table>
+
+        <div style="margin-top:20px;border:2px dashed #000;padding:12px;border-radius:8px;">
+            <strong style="font-size:13px;">🌟 Weekly Family Wins & High Fives:</strong>
+            <div style="height:50px;"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
