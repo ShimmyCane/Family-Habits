@@ -1,82 +1,68 @@
 # Action Plan: Fold Allowances into the Habits Project
 
 **Repo:** `Family-Habits` (destination)
-**Target Supabase project:** `twvqvutrcobedvuhnzxq`
-**Source Supabase project:** `kbhlwannygavrnwbebtf` (Allowances, to be archived)
+**Target Supabase project:** `twvqvutrcobedvuhnzxq` ("Family")
+**Source Supabase project:** `kbhlwannygavrnwbebtf` ("Allowance", to be archived)
 **Companion plan:** `../Allowances/ACTION_PLAN.md`
-**Draft SQL:** `supabase/allowances_migration.sql`
+**SQL:** `supabase/allowances_migration.sql`
 
-Status: draft. Nothing has been run or changed in either database.
+## Status (2026-10-23)
 
----
+| Step | State |
+|------|-------|
+| Read both live schemas and data | Done |
+| Create allowance tables, view, approval function, RLS in the habits project | Done |
+| Copy allowance data | Done (13 transactions) |
+| Reconcile source vs destination | Done, matches |
+| Test RLS and approval function | Done, passes |
+| Port the allowance screens to use the new tables | **Not started** (see section 5) |
+| Archive the Allowances project | **Not started** (yours to do, see companion plan) |
 
-## 0. Open decisions (answer before running anything)
+## 1. What the live schemas showed
 
-| # | Question | Default assumed in the draft SQL |
-|---|----------|----------------------------------|
-| D1 | Is the habits app parent-only (sign-in), or does it stay anonymous? | Signed-in users only. Anon gets nothing. |
-| D2 | Is this single-family, so `family_id` can go? | Yes, single family. `family_id` dropped. |
-| D3 | Keep `legacy_id` columns after the copy? | Yes, until reconciliation is signed off. |
-| D4 | Sign rule for `adjustment`? | Adds to balance (matches current app). |
-| D5 | Do Athena and Felix link to existing `family_members` rows? | No link for now. Plain `name` on `allowance_children`. |
+- **Allowances** has 2 children (Athena, Felix), 13 transactions (all deposits), 0 withdrawal requests, 1 family, 1 parent. Balances: Athena 6.25 (7 rows), Felix 5.50 (6 rows). Its `transactions.type` check only allows `deposit` and `withdrawal`, so the interest rows the old app tries to create (`ensureInterest`) would be rejected, and none exist.
+- **Habits** already has Athena and Felix in `family_members` (`role = 'kid'`), and every habit table uses sign-in-only (`authenticated`) policies. `habits.member_name` is a foreign key to `family_members.name`.
 
----
+## 2. Decisions (resolved from the live data)
 
-## 1. Prerequisites
+| # | Question | Decision |
+|---|----------|----------|
+| D1 | Anonymous or signed-in? | Signed-in only. Matches the existing habit tables. |
+| D2 | Keep `family_id`? | No. The habits project is single-family. |
+| D3 | Keep `legacy_id`? | Yes, until you sign off. Drop later with `alter table ... drop column legacy_id`. |
+| D4 | `adjustment` sign rule? | Adds to the balance, same as the old app. No adjustment rows exist today. |
+| D5 | Separate children table? | No. The ledger links to `family_members` by name, like `habits` does. The balance view only lists `role = 'kid'`. |
 
-- [ ] Connect the **Supabase** connector (claude.ai connector settings) so the live schema of both projects can be read directly.
-- [ ] Back up the habits project (Dashboard → Database → Backups, or `pg_dump --schema-only` and a data dump).
-- [ ] Back up the Allowances project the same way. Keep the backup until the archive is final.
-- [ ] Confirm the live `family_members`, `habits`, `habit_completions` and `family_reflections` columns match what `app.js` writes. The habit `schema.sql` is not in this repo. Its only copy is in ShimmyAI (`03 Projects/Family Habits/supabase/schema.sql`). Copy it into `supabase/` here.
+## 3. What was applied to the habits project
 
-## 2. Database changes (habits project)
+- `allowance_transactions`, `allowance_withdrawal_requests` (foreign key to `family_members(name)`, `on update cascade`)
+- `allowance_balances` view (`security_invoker`, kids only)
+- `approve_allowance_withdrawal(uuid)`: idempotent, signed-in only
+- RLS on both tables (signed-in full access, no anon access)
+- 13 transactions copied with their original ids in `legacy_id`
 
-File: `supabase/allowances_migration.sql`
+Notes:
+- The Supabase `apply_migration` tool timed out repeatedly, so only the table creation is in the migration history (`add_allowance_tables`). The rest was applied with `execute_sql`. `supabase/allowances_migration.sql` is the complete, re-runnable record of the final state.
+- Another migration (`storytime_tables`) appeared on this project while this was running. It is not part of this work and was not touched.
 
-- [ ] Review decisions D1–D5 and edit the SQL if any answer differs.
-- [ ] Verify no existing table or function is named `allowance_*` or `approve_allowance_withdrawal`. The script uses `if not exists` for tables but `create or replace` for the function, so a name clash would overwrite it.
-- [ ] Run the script in the SQL editor. It runs in one transaction.
-- [ ] Test RLS:
-  - anonymous request to `allowance_transactions` returns nothing or is denied
-  - signed-in request returns rows
-- [ ] Test `approve_allowance_withdrawal` twice on the same pending request. Expect one withdrawal row and the same returned id.
-- [ ] Test approving a declined request. Expect an exception.
+## 4. Verification results
 
-## 3. Manual data copy (you do this)
+- Row counts match (13 = 13) and an md5 checksum over every copied field is identical in both projects.
+- Balances match: Athena 6.25, Felix 5.50.
+- Anonymous read of `allowance_transactions` is denied.
+- Approve while signed out is rejected. Approving the same request twice returns the same transaction and creates one withdrawal (balance 6.25 → 5.25 in the test). A declined request cannot be approved.
+- Test rows were rolled back. Final state: 13 transactions, 0 requests.
+- Security advisor: no new findings besides `approve_allowance_withdrawal` being callable by signed-in users, which is intentional. Existing findings (the `games` views, `update_updated_at`, leaked-password protection) predate this work.
 
-Copy in this order, because of foreign keys:
+## 5. Remaining work
 
-1. `allowance_children` ← old `children` (keep old `id` as `legacy_id`, `name` from the live column)
-2. `allowance_transactions` ← old `transactions` (keep old `id` as `legacy_id`, map `child_id` through step 1)
-3. `allowance_withdrawal_requests` ← old `withdrawal_requests` (map `child_id`; for approved rows, set `approved_transaction_id` to the matching copied withdrawal, or leave it null and note it)
+- [ ] **Decide how to use the new tables from a screen.** The Allowances app (`../Allowances/public/app.js`) still talks to the old project. Options: point it at this project's tables (small change, see companion plan section 4), or add allowance screens to this app. Either needs a sign-in test that has to be done with a real parent login.
+- [ ] Copy the habit `schema.sql` from ShimmyAI (`03 Projects/Family Habits/supabase/`) into `supabase/`, or regenerate it from the live project.
+- [ ] `index.html` line ~874 still points to the ShimmyAI path for `schema.sql`. Update it once the file is in `supabase/`.
+- [ ] Optional: add the allowance tables to the Supabase Diagnostics panel (`app.js` ~207–225).
+- [ ] After sign-off: drop `legacy_id` columns.
 
-Watch for these:
-- [ ] **Interest rows.** The old app creates monthly interest on the client (`ensureInterest`) and can create duplicates if two browsers open at once. Check for duplicate `interest` rows per child per month and remove them before copying. Keep one per month.
-- [ ] **Interest rate.** It is stored in each browser's localStorage, not the database. Record the current rate (default 5%) so future interest can be set in the habits project.
-- [ ] Do not copy `family_id` or `created_by`. Drop them.
+## 6. Security notes
 
-## 4. Reconciliation
-
-- [ ] Run the reconciliation query at the bottom of `supabase/allowances_migration.sql` with the old balances from the Allowances app (per child).
-- [ ] Every row must show `match = true`. Do not archive the old project until they do.
-
-## 5. Changes to this repo (`Family-Habits`)
-
-Nothing here needs to change for the data move itself. These are needed so the repo matches the new state:
-
-- [ ] `supabase/`: add the habit schema copied from ShimmyAI, and `allowances_migration.sql`.
-- [ ] `index.html` line ~874: the diagnostics text points to `03 Projects/Family Habits/supabase/schema.sql` in ShimmyAI. Change it to `supabase/` in this repo.
-- [ ] `app.js` lines ~207–225: add the new tables to the diagnostics check (`allowance_children`, `allowance_transactions`, `allowance_withdrawal_requests`). This is only a health check, not a feature.
-- [ ] Decide whether to port the allowance screens (deposit, history, withdrawal review) into this app. That is a separate, later step. The data move does not depend on it.
-
-## 6. Security follow-ups
-
-- [ ] The publishable key is in `app.js` (line 6–7). That is acceptable only if RLS is correct. Re-check every table after the change, including the existing habit tables.
-- [ ] If the habits app stays anonymous (D1), the allowance tables are unreachable from it. That is intentional, but the allowance UI will need sign-in when it is ported.
-
-## 7. Done when
-
-- [ ] Reconciliation is all `match = true`.
-- [ ] RLS tests pass.
-- [ ] Repo changes in section 5 are committed.
-- [ ] Old Allowances project is archived (see companion plan, section 6).
+- The publishable key is in `app.js`. That is only safe because of RLS, so re-check RLS on any new table before the app uses it.
+- Enable leaked-password protection in Supabase Auth settings (existing advisor warning).
