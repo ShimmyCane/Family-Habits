@@ -15,7 +15,8 @@
 -- ----------------------------------------------------------------------------
 -- 1. Ledger: the source of truth for balances
 --    Sign rule (matches the old app): withdrawal subtracts; everything else adds.
---    amount is always positive.
+--    amount is positive, except 'adjustment' which is signed (the app offers
+--    "Adjustment (+/-)"), so a negative adjustment corrects a balance downward.
 -- ----------------------------------------------------------------------------
 create table if not exists public.allowance_transactions (
     id               uuid primary key default gen_random_uuid(),
@@ -24,7 +25,9 @@ create table if not exists public.allowance_transactions (
                      references public.family_members (name) on update cascade,
     type             text not null
                      check (type in ('deposit', 'withdrawal', 'interest', 'adjustment')),
-    amount           numeric(12,2) not null check (amount > 0),
+    amount           numeric(12,2) not null
+                     constraint allowance_transactions_amount_check
+                     check ((type = 'adjustment' and amount <> 0) or (type <> 'adjustment' and amount > 0)),
     note             text,
     achievement_tag  text,
     occurred_at      timestamptz not null default timezone('utc', now()),
@@ -33,6 +36,13 @@ create table if not exists public.allowance_transactions (
 
 create index if not exists allowance_transactions_member_idx
     on public.allowance_transactions (member_name, occurred_at);
+
+-- One interest row per kid per calendar month (UTC). The app creates interest
+-- from the browser, so two devices opening the same kid at once could otherwise
+-- double-pay. The app ignores the resulting unique violation (23505).
+create unique index if not exists allowance_one_interest_per_month
+    on public.allowance_transactions (member_name, (date_trunc('month', occurred_at at time zone 'utc')))
+    where type = 'interest';
 
 -- ----------------------------------------------------------------------------
 -- 2. Withdrawal requests

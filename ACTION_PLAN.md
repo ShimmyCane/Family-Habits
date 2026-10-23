@@ -15,7 +15,8 @@
 | Copy allowance data | Done (13 transactions) |
 | Reconcile source vs destination | Done, matches |
 | Test RLS and approval function | Done, passes |
-| Port the allowance screens to use the new tables | **Not started** (see section 5) |
+| Port the Allowances app to use the new tables | Done in a draft PR: `Allowances` PR #2 (not merged, real login untested) |
+| Add `app_table_registry` index to this project | Done (`supabase/app_registry.sql`) |
 | Archive the Allowances project | **Not started** (yours to do, see companion plan) |
 
 ## 1. What the live schemas showed
@@ -30,7 +31,7 @@
 | D1 | Anonymous or signed-in? | Signed-in only. Matches the existing habit tables. |
 | D2 | Keep `family_id`? | No. The habits project is single-family. |
 | D3 | Keep `legacy_id`? | Yes, until you sign off. Drop later with `alter table ... drop column legacy_id`. |
-| D4 | `adjustment` sign rule? | Adds to the balance, same as the old app. No adjustment rows exist today. |
+| D4 | `adjustment` sign rule? | Adds to the balance, same as the old app, and is the only type allowed to be negative (the form says "Adjustment (+/-)"). Other types must be positive. No adjustment rows exist today. |
 | D5 | Separate children table? | No. The ledger links to `family_members` by name, like `habits` does. The balance view only lists `role = 'kid'`. |
 
 ## 3. What was applied to the habits project
@@ -40,6 +41,8 @@
 - `approve_allowance_withdrawal(uuid)`: idempotent, signed-in only
 - RLS on both tables (signed-in full access, no anon access)
 - 13 transactions copied with their original ids in `legacy_id`
+- A unique index `allowance_one_interest_per_month`: one `interest` row per kid per month, because the app creates interest from the browser
+- `app_table_registry` and `app_table_unregistered` (see section 7)
 
 Notes:
 - The Supabase `apply_migration` tool timed out repeatedly, so only the table creation is in the migration history (`add_allowance_tables`). The rest was applied with `execute_sql`. `supabase/allowances_migration.sql` is the complete, re-runnable record of the final state.
@@ -56,13 +59,28 @@ Notes:
 
 ## 5. Remaining work
 
-- [ ] **Decide how to use the new tables from a screen.** The Allowances app (`../Allowances/public/app.js`) still talks to the old project. Options: point it at this project's tables (small change, see companion plan section 4), or add allowance screens to this app. Either needs a sign-in test that has to be done with a real parent login.
+- [ ] **Merge `Allowances` PR #2** (it points the Allowances app at these tables) after checking the login. This project has one auth user, so the Allowances app signs in with the same email and password as this app. Merging switches the live Allowances site; the old project is untouched, so it can be reverted.
 - [ ] Copy the habit `schema.sql` from ShimmyAI (`03 Projects/Family Habits/supabase/`) into `supabase/`, or regenerate it from the live project.
 - [ ] `index.html` line ~874 still points to the ShimmyAI path for `schema.sql`. Update it once the file is in `supabase/`.
 - [ ] Optional: add the allowance tables to the Supabase Diagnostics panel (`app.js` ~207–225).
 - [ ] After sign-off: drop `legacy_id` columns.
 
-## 6. Security notes
+## 6a. Verification added after the port
+
+- Browser test (Chromium, real `app.js`, stand-in Supabase client enforcing this schema): 23/23 passed, covering the kid picker, balances, deposit, negative adjustment, rejected negative deposit, two months of interest, no double interest, and the duplicate-interest race.
+- Same reads and writes run as the `authenticated` role against this database, rolled back.
+- Negative adjustment accepted; negative deposit, zero adjustment and a second interest row in a month rejected.
+
+## 7. Table index (`app_table_registry`)
+
+`supabase/app_registry.sql` adds an index of which app uses which table in this project:
+
+- `app_table_registry`: one row per (app, table/view/function), with `owner` or `reads`. Seeded with habits and allowances.
+- `app_table_unregistered`: a view of anything in `public` nobody has registered. Today it lists the `games`/`play_*` tables (Moment) and `storytime_*`, which still need an owner.
+
+Convention and a reusable template for other projects: ShimmyAI `04 AI/Supabase Registry/`. When you add a table, register it in the same migration.
+
+## 8. Security notes
 
 - The publishable key is in `app.js`. That is only safe because of RLS, so re-check RLS on any new table before the app uses it.
 - Enable leaked-password protection in Supabase Auth settings (existing advisor warning).
