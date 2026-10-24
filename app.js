@@ -1834,6 +1834,10 @@ window.addEventListener('DOMContentLoaded', async () => {
         runDiagnostics();
     });
 
+    $('settings-changelog-btn').addEventListener('click', () => {
+        window.location.href = 'changelog.html';
+    });
+
     $('save-profile-btn').addEventListener('click', handleSaveProfile);
 
     $('grace-period-select').value = gracePeriodDays;

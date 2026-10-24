@@ -1,0 +1,48 @@
+{
+  "updated": "2026-10-24",
+  "statuses": {
+    "live": "Running on the live site or database, and checked.",
+    "merged": "On main, but not fully checked. See the to-do list.",
+    "notes": "Tracked in the AI notes (ShimmyAI). Not part of these apps."
+  },
+  "todo": [
+    { "id": "T1", "priority": "high", "owner": "you", "area": "Allowances", "item": "Sign in to the Allowances site with a parent account. It uses the same login as the habits app. Check the balances match, then deposit and withdraw once." },
+    { "id": "T2", "priority": "high", "owner": "you", "area": "Allowances", "item": "Back up the old Allowances Supabase project (kbhlwannygavrnwbebtf), then pause or delete it. Its data is already copied and checked." },
+    { "id": "T3", "priority": "medium", "owner": "you", "area": "Family database", "item": "Decide on family_reflections. The habits app uses it, but the table doesn't exist, so weekly reflections stay on each device. Create the table, or tell Claude to remove the code that uses it." },
+    { "id": "T4", "priority": "medium", "owner": "claude", "area": "Allowances", "item": "The interest rate is still saved in each browser. Move it into the database so both parents share it." },
+    { "id": "T5", "priority": "medium", "owner": "claude", "area": "Allowances", "item": "Withdrawal requests can only be viewed. Add approve and decline buttons; the database function already exists." },
+    { "id": "T6", "priority": "medium", "owner": "you", "area": "Security", "item": "In Supabase Auth settings, turn on leaked-password protection (currently off)." },
+    { "id": "T7", "priority": "medium", "owner": "you", "area": "Security", "item": "Supabase flags the games views (active_games_view, all_games_view) as running with their creator's permissions. Check whether that is intended." },
+    { "id": "T8", "priority": "low", "owner": "claude", "area": "Security", "item": "The update_updated_at function has no fixed search path (Supabase advisor warning)." },
+    { "id": "T9", "priority": "low", "owner": "you", "area": "Family database", "item": "Register the Moment and StoryTime tables in the table index. You asked for this to wait." },
+    { "id": "T10", "priority": "low", "owner": "you", "area": "Family database", "item": "After the Allowances check (T1), tell Claude to drop the temporary legacy_id columns on the allowance tables." },
+    { "id": "T11", "priority": "medium", "owner": "you", "area": "Family Habits", "item": "Confirm the scoring. Adding a task you haven't done yet still lowers the percentage. Say if you want that changed." },
+    { "id": "T12", "priority": "low", "owner": "you", "area": "Family Habits", "item": "Check the member cards and scores on your phone or iPad. The tests ran in a desktop browser only." },
+    { "id": "T13", "priority": "low", "owner": "you", "area": "Allowances", "item": "Check the Allowances layout on an iPhone after the switch." }
+  ],
+  "versions": [
+    { "version": "1.01", "date": "2026-09-19", "project": "AI notes", "title": "AI notes repo started", "summary": "Set up the ShimmyAI folder for plans, references and project notes.", "status": "notes" },
+    { "version": "1.02", "date": "2026-09-20", "project": "Primes 01", "title": "Primes 01 visualizer finished", "summary": "Prime visualizer, later extended with a universal quiz mode and seed-growth animations.", "status": "notes" },
+    { "version": "1.03", "date": "2026-09-23", "project": "Felix Checkers", "title": "Felix Checkers MVP", "summary": "iPad-friendly checkers with a Felix hybrid mode, two- and three-row starts, and sound.", "status": "notes" },
+    { "version": "1.04", "date": "2026-09-24", "project": "Detail Library", "title": "Detail Library prep", "summary": "Layout and setup work that later became Quick Detail.", "status": "notes" },
+    { "version": "1.05", "date": "2026-10-03", "project": "Test Bank", "title": "Test Bank knowledge base updated", "summary": "Test Bank knowledge base refreshed with new conversations and summaries.", "status": "notes" },
+    { "version": "1.06", "date": "2026-10-04", "project": "Family Accounting", "title": "Family Accounting project added", "summary": "Project folder and planning notes created.", "status": "notes" },
+    { "version": "1.07", "date": "2026-10-05", "project": "Coins 01 and Row Boat", "title": "Coins 01 and Row Boat visualizers", "summary": "Coin-combo visualizer with table, graph and strategy views, plus the Row Boat river-crossing puzzle.", "status": "notes" },
+    { "version": "1.08", "date": "2026-10-08", "project": "AI notes", "title": "Projects published to GitHub", "summary": "Project folders pushed to GitHub, the start of the Pages sites.", "status": "notes" },
+    { "version": "1.09", "date": "2026-10-10", "project": "Allowances", "title": "Allowances (Family Bank) app", "summary": "Parent login, a ledger per child, monthly interest and a settings screen. Its AI brief and lessons were written the same week.", "status": "notes" },
+    { "version": "1.10", "date": "2026-10-17", "project": "Family Habits", "title": "Family Habits app started", "summary": "Chores and goals per family member, a weekly tracker, a task bank and a Sunday reflection.", "status": "notes" },
+    { "version": "1.11", "date": "2026-10-17", "project": "Family Habits", "title": "Family Habits deploy fixes", "summary": "GitHub Pages deploy configuration corrected and simplified.", "status": "notes" },
+    { "version": "1.12", "date": "2026-10-19", "project": "Reader Level Test", "title": "Reader Level Test banks", "summary": "Seven practice banks of 15 questions each, browser-tested. Not official assessments.", "status": "notes" },
+    { "version": "1.13", "date": "2026-10-22", "project": "Moment", "title": "Moment MVP", "summary": "Spinning game wheel with 15 games, Supabase schema, an admin studio and a restyle to the Family Habits look.", "status": "notes" },
+    { "version": "1.14", "date": "2026-10-22", "project": "StoryTime", "title": "StoryTime started", "summary": "Project schematic, questions and AI brief written.", "status": "notes" },
+    { "version": "1.15", "date": "2026-10-23", "project": "Quick Detail", "title": "Quick Detail MVP", "summary": "Offline construction-detail editor with exports to PDF, SVG, PNG, JPEG, DXF and JSON.", "status": "notes" },
+    { "version": "1.16", "date": "2026-10-23", "project": "StoryTime", "title": "StoryTime MVP and tables", "summary": "Split-file app with dials, story openings, narration and Supabase sync. Its tables were added to the Family database.", "status": "notes" },
+    { "version": "1.17", "date": "2026-10-23", "project": "Family Habits (database)", "title": "Allowances data moved into the Family database", "summary": "13 transactions copied and checked against the old balances (Athena 6.25, Felix 5.50). Allowance tables added with sign-in-only access. Family Habits PR #1.", "status": "live" },
+    { "version": "1.18", "date": "2026-10-23", "project": "Allowances", "title": "Allowances retirement plan", "summary": "Plan for freezing, copying, checking and archiving the old Allowances project. Allowances PR #1.", "status": "merged" },
+    { "version": "1.19", "date": "2026-10-23", "project": "Allowances", "title": "Allowances app uses the Family database", "summary": "The site reads kids from the family members list and writes to the allowance tables. Negative adjustments allowed; one interest payment per kid per month. Allowances PR #2. The sign-in has not been tested.", "status": "merged" },
+    { "version": "1.20", "date": "2026-10-23", "project": "Family database", "title": "Table index added", "summary": "app_table_registry records which app uses which table, with a view that lists anything unclaimed. The convention is saved in the AI notes. ShimmyAI PR #4.", "status": "live" },
+    { "version": "1.21", "date": "2026-10-24", "project": "Family Habits", "title": "Habits schema snapshot", "summary": "Snapshot of the habit tables and their access rules, plus the data state (28 habits, 75 completions). Family Habits PR #2. Documentation only.", "status": "merged" },
+    { "version": "1.22", "date": "2026-10-24", "project": "Family Habits", "title": "Member card and scoring fixes", "summary": "The first click on a member card now shows that member's habits. Scores count every completion, so bonuses can make up for shortfalls and the percentage can go above 100. Family Habits PR #3.", "status": "live" },
+    { "version": "1.23", "date": "2026-10-24", "project": "Family Habits", "title": "Change log and to-do page", "summary": "This page, opened from Settings. The to-do list shows what needs checking or chasing. Updated by hand when changes are merged.", "status": "merged" }
+  ]
+}
