@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Change Log · Family Habits</title>
+    <style>
+        :root {
+            --ink: #1d1d1f;
+            --paper: #fffdf7;
+            --sun: #ffd23f;
+            --mint: #6bd8a0;
+            --pink: #ff6b9d;
+            --sky: #4cc9f0;
+            --grey: #6b6b70;
+            --line: #e6e1d3;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --ink: #f2f2f2;
+                --paper: #1e1e22;
+                --grey: #a8a8b0;
+                --line: #3a3a42;
+            }
+        }
+        :root[data-theme="dark"] {
+            --ink: #f2f2f2;
+            --paper: #1e1e22;
+            --grey: #a8a8b0;
+            --line: #3a3a42;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Patrick Hand", "Trebuchet MS", system-ui, sans-serif;
+            color: var(--ink);
+            background: var(--paper);
+            font-size: 17px;
+            line-height: 1.4;
+        }
+        main { max-width: 760px; margin: 0 auto; padding: 16px; }
+        header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        h1 { font-size: 26px; margin: 8px 0; }
+        h2 { font-size: 20px; margin: 26px 0 10px; text-transform: uppercase; letter-spacing: .5px; }
+        a.back { color: var(--ink); font-weight: bold; text-decoration: none; border: 2px solid var(--ink); border-radius: 12px; padding: 6px 12px; }
+        .strip {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 14px 0;
+        }
+        .tile { border: 2px solid var(--ink); border-radius: 14px; padding: 10px 12px; background: #fff; color: #1d1d1f; }
+        .tile .label { font-size: 13px; text-transform: uppercase; letter-spacing: .5px; opacity: .75; }
+        .tile .big { font-size: 24px; font-weight: bold; }
+        .tile .small { font-size: 14px; opacity: .8; }
+        .card { border: 2px solid var(--ink); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; background: var(--paper); }
+        .row-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+        .ver { font-weight: bold; font-size: 18px; }
+        .date { color: var(--grey); font-size: 14px; }
+        .title { font-weight: bold; font-size: 18px; margin: 4px 0; }
+        .summary { color: var(--grey); margin: 0; }
+        .project { font-size: 13px; color: var(--grey); text-transform: uppercase; letter-spacing: .4px; }
+        .badge {
+            display: inline-block; font-size: 13px; font-weight: bold; text-transform: uppercase;
+            border: 2px solid var(--ink); border-radius: 999px; padding: 1px 9px; color: #1d1d1f; background: #fff;
+        }
+        .badge.live { background: var(--mint); }
+        .badge.merged { background: var(--sun); }
+        .badge.notes { background: #e9e9ee; }
+        .badge.high { background: var(--pink); }
+        .badge.medium { background: var(--sun); }
+        .badge.low { background: #e9e9ee; }
+        .badge.you { background: var(--sky); }
+        .badge.claude { background: #e9e9ee; }
+        .todo { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; }
+        .todo .meta { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+        .todo .text { margin: 0; }
+        .muted { color: var(--grey); font-size: 14px; }
+        .error { background: #fdecea; color: #b71c1c; padding: 10px; border-radius: 10px; }
+        footer { margin: 28px 0 40px; font-size: 14px; color: var(--grey); }
+        footer a { color: var(--ink); }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <h1>📜 Change Log</h1>
+        <a class="back" href="index.html">← Back to Family Habits</a>
+    </header>
+
+    <div id="status" class="strip" aria-live="polite">
+        <div class="tile"><div class="label">Loading</div><div class="big">…</div></div>
+    </div>
+
+    <h2>🔔 To-do</h2>
+    <p class="muted">Blue "you" items need you. Grey "claude" items are next for Claude. Pink is high priority, yellow medium.</p>
+    <div id="todo"></div>
+
+    <h2>🗂️ History</h2>
+    <p class="muted">Newest first. <span class="badge live">Live</span> means checked on the live site or database. <span class="badge merged">Merged</span> means on main but not fully checked. <span class="badge notes">Notes</span> means tracked in the AI notes only.</p>
+    <div id="versions"></div>
+
+    <footer>
+        Merged history on GitHub:
+        <a href="https://github.com/ShimmyCane/Family-Habits/commits/main" target="_blank" rel="noopener">Family-Habits commits</a>.
+        This page is updated by hand when changes are merged, so the GitHub link is the source to trust if they disagree.
+    </footer>
+</main>
+
+<script>
+(function () {
+    const $ = (id) => document.getElementById(id);
+
+    function el(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined && text !== null) node.textContent = text;
+        return node;
+    }
+
+    function tile(label, big, small) {
+        const t = el('div', 'tile');
+        t.appendChild(el('div', 'label', label));
+        t.appendChild(el('div', 'big', big));
+        if (small) t.appendChild(el('div', 'small', small));
+        return t;
+    }
+
+    function renderStatus(data) {
+        const versions = data.versions || [];
+        const latest = versions[versions.length - 1];
+        const latestLive = versions.slice().reverse().find((v) => v.status === 'live');
+        const open = (data.todo || []).length;
+        const strip = $('status');
+        strip.textContent = '';
+        strip.appendChild(tile('Newest change', latest ? 'v' + latest.version : '—', latest ? latest.title : null));
+        strip.appendChild(tile('Newest checked live', latestLive ? 'v' + latestLive.version : '—', latestLive ? latestLive.title : null));
+        strip.appendChild(tile('Open to-do items', String(open), 'Updated ' + data.updated));
+    }
+
+    function renderTodo(data) {
+        const box = $('todo');
+        box.textContent = '';
+        const items = (data.todo || []).slice().sort((a, b) => {
+            const rank = { you: 0, claude: 1 };
+            const p = { high: 0, medium: 1, low: 2 };
+            return (rank[a.owner] - rank[b.owner]) || (p[a.priority] - p[b.priority]);
+        });
+        if (!items.length) { box.appendChild(el('div', 'card muted', 'Nothing open.')); return; }
+        items.forEach((t) => {
+            const card = el('div', 'card todo');
+            card.appendChild(el('div', 'ver', t.id));
+            const body = el('div');
+            const meta = el('div', 'meta');
+            meta.appendChild(el('span', 'badge ' + t.priority, t.priority));
+            meta.appendChild(el('span', 'badge ' + t.owner, t.owner === 'you' ? 'you' : 'claude'));
+            meta.appendChild(el('span', 'project', t.area));
+            body.appendChild(meta);
+            body.appendChild(el('p', 'text', t.item));
+            card.appendChild(body);
+            box.appendChild(card);
+        });
+    }
+
+    function renderVersions(data) {
+        const box = $('versions');
+        box.textContent = '';
+        const versions = (data.versions || []).slice().reverse();
+        versions.forEach((v) => {
+            const card = el('div', 'card');
+            const top = el('div', 'row-top');
+            const left = el('div');
+            left.appendChild(el('span', 'ver', 'v' + v.version));
+            left.appendChild(document.createTextNode('  '));
+            left.appendChild(el('span', 'date', v.date));
+            top.appendChild(left);
+            top.appendChild(el('span', 'badge ' + v.status, v.status === 'live' ? 'Live' : v.status === 'merged' ? 'Merged' : 'Notes'));
+            card.appendChild(top);
+            card.appendChild(el('div', 'project', v.project));
+            card.appendChild(el('div', 'title', v.title));
+            card.appendChild(el('p', 'summary', v.summary));
+            box.appendChild(card);
+        });
+    }
+
+    function fail(message) {
+        const strip = $('status');
+        strip.textContent = '';
+        strip.appendChild(el('div', 'error', message));
+    }
+
+    fetch('changelog.json', { cache: 'no-store' })
+        .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then((data) => { renderStatus(data); renderTodo(data); renderVersions(data); })
+        .catch((e) => fail('Could not load changelog.json (' + e.message + '). Open this page from the live site, not from a file on disk.'));
+})();
+</script>
+</body>
+</html>
