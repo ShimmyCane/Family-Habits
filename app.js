@@ -443,6 +443,21 @@ function renderCurrentView() {
 // ------------------------------------------------------------------------------
 // VIEW 1: FRONT PAGE / HOME DASHBOARD
 // ------------------------------------------------------------------------------
+// Weekly score for one member. Every completion counts, including extra ones
+// (bonuses), so extra work on one task can make up for a shortfall on another.
+// The percent can go above 100.
+function memberWeekScore(memberName) {
+    const memberHabitsList = allHabits.filter(h => h.is_active !== false && h.member_name === memberName);
+    let done = 0;
+    let target = 0;
+    memberHabitsList.forEach(habit => {
+        target += habit.target_count || (habit.target_frequency === 'daily' ? 7 : 3);
+        done += allCompletions.filter(c => c.habit_id === habit.id).length;
+    });
+    const percent = target > 0 ? Math.round((done / target) * 100) : 0;
+    return { done, target, percent };
+}
+
 function renderHomeView() {
     const week = getWeekDates(weekOffset);
     const first = week[0];
@@ -453,18 +468,7 @@ function renderHomeView() {
     container.innerHTML = '';
 
     familyMembers.forEach(member => {
-        const memberHabitsList = allHabits.filter(h => h.is_active !== false && h.member_name === member.name);
-        let totalTarget = 0;
-        let totalCompleted = 0;
-
-        memberHabitsList.forEach(habit => {
-            const target = habit.target_count || (habit.target_frequency === 'daily' ? 7 : 3);
-            const doneCount = allCompletions.filter(c => c.habit_id === habit.id).length;
-            totalTarget += target;
-            totalCompleted += Math.min(doneCount, target);
-        });
-
-        const percent = totalTarget > 0 ? Math.round((totalCompleted / totalTarget) * 100) : 0;
+        const { done, target, percent } = memberWeekScore(member.name);
         const badges = calculateMemberBadges(member.name);
 
         const card = document.createElement('div');
@@ -478,14 +482,15 @@ function renderHomeView() {
             <div class="card-name">${member.name}</div>
             <div class="badge-chips">${badgesHtml}</div>
             <div class="progress-bar-container">
-                <div class="progress-bar-fill" style="width:${percent}%; background-color:${member.color || 'var(--mint)'};"></div>
+                <div class="progress-bar-fill" style="width:${Math.min(percent, 100)}%; background-color:${member.color || 'var(--mint)'};"></div>
             </div>
-            <div class="card-stat-text">${totalCompleted}/${totalTarget} done (${percent}%)</div>
+            <div class="card-stat-text">${done}/${target} done (${percent}%)</div>
         `;
 
         card.addEventListener('click', () => {
             playPopTone();
             currentMember = member.name;
+            memberHabits = allHabits.filter(h => h.is_active !== false && h.member_name === currentMember);
             switchView('member');
         });
 
@@ -1256,16 +1261,14 @@ function showNextReel() {
     let choresTarget = 0;
     chores.forEach(c => {
         choresTarget += c.target_count || 7;
-        const count = allCompletions.filter(comp => comp.habit_id === c.id).length;
-        choresDone += Math.min(count, c.target_count || 7);
+        choresDone += allCompletions.filter(comp => comp.habit_id === c.id).length;
     });
 
     let goalsDone = 0;
     let goalsTarget = 0;
     goals.forEach(g => {
         goalsTarget += g.target_count || 3;
-        const count = allCompletions.filter(comp => comp.habit_id === g.id).length;
-        goalsDone += Math.min(count, g.target_count || 3);
+        goalsDone += allCompletions.filter(comp => comp.habit_id === g.id).length;
     });
 
     $('reel-chores-stat').textContent = `${choresDone}/${choresTarget}`;
@@ -1308,16 +1311,7 @@ function showComparisonBoard() {
     leaderboardContainer.innerHTML = '';
 
     const memberStats = familyMembers.map(member => {
-        const mHabits = allHabits.filter(h => h.is_active !== false && h.member_name === member.name);
-        let target = 0;
-        let done = 0;
-        mHabits.forEach(h => {
-            const t = h.target_count || 7;
-            target += t;
-            const count = allCompletions.filter(c => c.habit_id === h.id).length;
-            done += Math.min(count, t);
-        });
-        const rate = target > 0 ? Math.round((done / target) * 100) : 0;
+        const { done, target, percent: rate } = memberWeekScore(member.name);
         return { member, done, target, rate };
     });
 
@@ -1335,7 +1329,7 @@ function showComparisonBoard() {
             <div class="leaderboard-info">
                 <div class="leaderboard-name">${item.member.name} (${item.done}/${item.target} done)</div>
                 <div class="leaderboard-bar-bg">
-                    <div class="leaderboard-bar-fill" style="width:${item.rate}%;background-color:${item.member.color || 'var(--mint)'};"></div>
+                    <div class="leaderboard-bar-fill" style="width:${Math.min(item.rate, 100)}%;background-color:${item.member.color || 'var(--mint)'};"></div>
                 </div>
             </div>
             <div class="leaderboard-rate">${item.rate}%</div>
