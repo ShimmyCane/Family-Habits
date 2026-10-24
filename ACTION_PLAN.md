@@ -19,6 +19,13 @@
 | Add `app_table_registry` index to this project | Done (`supabase/app_registry.sql`) |
 | Archive the Allowances project | **Not started** (yours to do, see companion plan) |
 
+## Update 2026-10-24: habit data changed, structure did not
+
+- Habit tables now hold 28 habits (was 21) and 75 completions (was 51). Athena 9, Felix 11, Jimmy 5, Ying 3.
+- Columns, constraints and policies are unchanged. Snapshot of the structure: `supabase/habits_schema.sql`.
+- Allowance tables are unchanged (13 transactions, 0 requests).
+- `family_reflections` is still not in the live project; it is documented in `habits_schema.sql`.
+
 ## 1. What the live schemas showed
 
 - **Allowances** has 2 children (Athena, Felix), 13 transactions (all deposits), 0 withdrawal requests, 1 family, 1 parent. Balances: Athena 6.25 (7 rows), Felix 5.50 (6 rows). Its `transactions.type` check only allows `deposit` and `withdrawal`, so the interest rows the old app tries to create (`ensureInterest`) would be rejected, and none exist.
