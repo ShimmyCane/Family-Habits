@@ -50,7 +50,9 @@ let selectedCustomColor = '#ff6b9d';
 let reelIndex = 0;
 let reelProgressTimer = null;
 let reelPaused = false;
-let reelElapsedMs = 0;
+let reelElapsedMs = 0; // time in the current scene
+let reelPersonElapsedMs = 0; // time through the whole reel for the current person
+let reelPersonMs = 0; // total length of the current person's reel
 let reelScenes = [];
 let reelSceneIndex = 0;
 let reelSceneMs = 0;
@@ -1429,6 +1431,10 @@ function showNextReel() {
 
     reelScenes = buildReelScenes(member);
     reelSceneIndex = 0;
+    // The bottom bar covers this person's whole reel, so it only resets here
+    reelPersonMs = reelScenes.reduce((total, scene) => total + scene.ms, 0);
+    reelPersonElapsedMs = 0;
+    $('reel-timer-fill').style.width = '0%';
     playFanfare();
     playReelScene();
 }
@@ -1441,13 +1447,13 @@ function playReelScene() {
     reelElapsedMs = 0;
 
     $('reel-stage').innerHTML = scene.html;
-    $('reel-timer-fill').style.width = '0%';
     if (scene.onMount) scene.onMount(reelSceneToken);
 
     reelProgressTimer = setInterval(() => {
         if (reelPaused) return;
         reelElapsedMs += REEL_STEP_MS;
-        const pct = Math.min((reelElapsedMs / reelSceneMs) * 100, 100);
+        reelPersonElapsedMs += REEL_STEP_MS;
+        const pct = Math.min((reelPersonElapsedMs / reelPersonMs) * 100, 100);
         $('reel-timer-fill').style.width = `${pct}%`;
 
         if (reelElapsedMs >= reelSceneMs) {
