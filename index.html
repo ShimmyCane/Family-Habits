@@ -570,9 +570,10 @@
         }
 
         .reel-avatar {
-            font-size: 72px;
+            font-size: 60px;
             filter: drop-shadow(3px 3px 0 var(--ink));
-            margin-bottom: 8px;
+            margin-bottom: 4px;
+            display: inline-block;
         }
 
         .reel-name {
@@ -584,7 +585,7 @@
 
         .reel-stats-box {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 12px;
             margin: 18px 0;
         }
@@ -609,10 +610,120 @@
 
         .reel-praise {
             font-family: "Patrick Hand", cursive;
-            font-size: 22px;
+            font-size: 24px;
             color: #333;
-            margin: 14px 0 18px;
-            min-height: 48px;
+            margin: 14px 0 10px;
+        }
+
+        /* Scenes inside the celebration reel */
+        .reel-stage {
+            position: relative;
+            min-height: 230px;
+            overflow: hidden;
+        }
+
+        .reel-scene {
+            animation: reel-scene-in 0.45s ease-out both;
+        }
+
+        .reel-kicker {
+            font-size: 13px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #777;
+            margin-bottom: 6px;
+        }
+
+        .reel-big {
+            font-size: 30px;
+            font-weight: 800;
+            line-height: 1.2;
+            margin: 24px 0 12px;
+        }
+
+        .reel-sparkles {
+            font-size: 34px;
+            display: flex;
+            justify-content: center;
+            gap: 14px;
+        }
+
+        .reel-sparkles span {
+            display: inline-block;
+            animation: reel-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both, reel-wiggle 1.6s ease-in-out 0.6s infinite;
+            animation-delay: calc(var(--i, 0) * 0.15s), calc(var(--i, 0) * 0.15s + 0.6s);
+        }
+
+        .reel-of {
+            font-size: 0.55em;
+            color: #888;
+            margin-left: 2px;
+        }
+
+        .reel-overall-bar {
+            height: 16px;
+            background: #eee;
+            border: 3px solid var(--ink);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 6px 0 10px;
+        }
+
+        .reel-overall-fill {
+            height: 100%;
+            width: 0;
+            background: linear-gradient(90deg, var(--mint), var(--sun));
+            border-right: 3px solid var(--ink);
+            animation: reel-grow 1.2s ease-out 0.3s both;
+        }
+
+        .reel-caption {
+            font-family: "Patrick Hand", cursive;
+            font-size: 20px;
+            color: #444;
+            margin: 6px 0;
+        }
+
+        .reel-highlight-emoji {
+            font-size: 64px;
+            line-height: 1.1;
+            display: inline-block;
+            filter: drop-shadow(3px 3px 0 var(--ink));
+        }
+
+        .reel-highlight-name {
+            font-size: 24px;
+            font-weight: 800;
+            margin-top: 6px;
+        }
+
+        .reel-highlight-score {
+            font-size: 18px;
+            color: #555;
+            margin: 2px 0 12px;
+        }
+
+        .reel-tag {
+            display: inline-block;
+            font-weight: 800;
+            font-size: 16px;
+            background: var(--sun);
+            border: 3px solid var(--ink);
+            border-radius: 999px;
+            padding: 6px 14px;
+            box-shadow: 2px 2px 0 var(--ink);
+        }
+
+        .reel-confetti {
+            position: absolute;
+            top: -14px;
+            width: 10px;
+            height: 14px;
+            border: 2px solid var(--ink);
+            border-radius: 2px;
+            pointer-events: none;
+            animation: reel-confetti-fall 2.4s ease-in forwards;
         }
 
         .reel-timer-bar {
@@ -629,6 +740,59 @@
             background: var(--pink);
             width: 0%;
             transition: width 0.1s linear;
+        }
+
+        .reel-pop {
+            animation: reel-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+            animation-delay: calc(var(--i, 0) * 0.15s);
+        }
+
+        .reel-bounce {
+            animation: reel-bounce 1.2s ease-in-out infinite;
+        }
+
+        @keyframes reel-scene-in {
+            from { opacity: 0; transform: translateY(18px) scale(0.96); }
+            to { opacity: 1; transform: none; }
+        }
+
+        @keyframes reel-pop {
+            from { opacity: 0; transform: scale(0.4); }
+            to { opacity: 1; transform: none; }
+        }
+
+        @keyframes reel-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes reel-wiggle {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-12deg); }
+            75% { transform: rotate(12deg); }
+        }
+
+        @keyframes reel-grow {
+            from { width: 0; }
+            to { width: var(--w); }
+        }
+
+        @keyframes reel-confetti-fall {
+            0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+            100% { transform: translate(var(--drift, 0px), 280px) rotate(540deg); opacity: 0; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .reel-scene,
+            .reel-pop,
+            .reel-bounce,
+            .reel-sparkles span,
+            .reel-overall-fill {
+                animation: none !important;
+            }
+            .reel-confetti {
+                display: none;
+            }
         }
 
         /* Comparison Board */
@@ -975,17 +1139,9 @@
                 <div class="reel-card" id="reel-card">
                     <div class="reel-avatar" id="reel-avatar">🦄</div>
                     <h2 class="reel-name" id="reel-name">Athena</h2>
-                    <div class="reel-praise" id="reel-praise">"Outstanding effort this week!"</div>
 
-                    <div class="reel-stats-box">
-                        <div class="reel-stat">
-                            <div class="reel-stat-num" id="reel-chores-stat" style="color:var(--mint);">7/7</div>
-                            <div class="reel-stat-label">Chores Done</div>
-                        </div>
-                        <div class="reel-stat">
-                            <div class="reel-stat-num" id="reel-goals-stat" style="color:var(--coral);">5/5</div>
-                            <div class="reel-stat-label">Goals Done</div>
-                        </div>
+                    <div class="reel-stage" id="reel-stage">
+                        <!-- Scenes for each person are drawn here -->
                     </div>
 
                     <div class="reel-timer-bar">

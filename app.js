@@ -51,7 +51,12 @@ let reelIndex = 0;
 let reelProgressTimer = null;
 let reelPaused = false;
 let reelElapsedMs = 0;
-const REEL_DURATION_MS = 5000;
+let reelScenes = [];
+let reelSceneIndex = 0;
+let reelSceneMs = 0;
+let reelSceneToken = 0;
+let reelPreviousCompletions = null; // last week's completions, null if they could not be loaded
+const REEL_STEP_MS = 100;
 
 // Helper DOM selector
 const $ = (id) => document.getElementById(id);
@@ -1228,16 +1233,187 @@ async function permanentlyDeleteFromBank(habit) {
 // ==============================================================================
 // VIEW 3: SUNDAY MEETING & CELEBRATION REEL (Round 2, Item 1)
 // ==============================================================================
-function startSundayMeeting() {
+async function startSundayMeeting() {
     clearInterval(reelProgressTimer);
     reelIndex = 0;
     reelPaused = false;
     reelElapsedMs = 0;
+    $('reel-pause-btn').textContent = '⏸️ Pause';
 
     $('reel-container').style.display = 'block';
     $('comparison-board').style.display = 'none';
 
+    reelPreviousCompletions = await loadPreviousWeekCompletions();
     showNextReel();
+}
+
+// Last week's completions, used to spot goals that were hard last week and hit this week.
+// Returns null (and the reel skips those highlights) if the data cannot be loaded.
+async function loadPreviousWeekCompletions() {
+    const currentStart = getWeekDates(weekOffset)[0].iso;
+    try {
+        const { data, error } = await _supabase
+            .from('habit_completions')
+            .select('*')
+            .gte('completed_date', shiftIsoDate(currentStart, -7))
+            .lt('completed_date', currentStart);
+
+        if (error) {
+            console.warn('Could not load last week for the meeting:', error.message);
+            return null;
+        }
+        return data || [];
+    } catch (e) {
+        console.warn('Network notice loading last week for the meeting:', e);
+        return null;
+    }
+}
+
+function shiftIsoDate(iso, days) {
+    const d = new Date(`${iso}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+}
+
+// Mirrors the target shown on each habit card
+function habitTarget(habit) {
+    return habit.target_count || (habit.target_frequency === 'daily' ? 7 : 3);
+}
+
+// Builds the sequence of scenes for one person: intro, tally, up to three highlights, encouragement.
+function buildReelScenes(member) {
+    const currentStart = getWeekDates(weekOffset)[0].iso;
+    const memberHabitsList = allHabits.filter(h => h.is_active !== false && h.member_name === member.name);
+
+    const rows = memberHabitsList.map(habit => {
+        const done = allCompletions.filter(c => c.habit_id === habit.id).length;
+        const target = habitTarget(habit);
+        const lastDone = reelPreviousCompletions
+            ? reelPreviousCompletions.filter(c => c.habit_id === habit.id).length
+            : null;
+        const existedLastWeek = (habit.created_at || '').slice(0, 10) < currentStart;
+        return {
+            habit,
+            done,
+            target,
+            extra: Math.max(done - target, 0),
+            met: done >= target,
+            breakthrough: done >= target && existedLastWeek && lastDone !== null && lastDone < target,
+            lastDone
+        };
+    });
+
+    const choresRows = rows.filter(r => r.habit.type === 'chore');
+    const goalsRows = rows.filter(r => r.habit.type === 'goal');
+    const sum = (list, key) => list.reduce((total, r) => total + r[key], 0);
+    const choresDone = sum(choresRows, 'done');
+    const choresTotal = sum(choresRows, 'target');
+    const goalsDone = sum(goalsRows, 'done');
+    const goalsTotal = sum(goalsRows, 'target');
+    const totalDone = choresDone + goalsDone;
+    const totalTarget = choresTotal + goalsTotal;
+    const percent = totalTarget > 0 ? Math.round((totalDone / totalTarget) * 100) : 0;
+    const allMet = rows.length > 0 && rows.every(r => r.met);
+    const anyExtra = rows.some(r => r.extra > 0);
+    const name = escapeHtml(member.name);
+
+    const scenes = [];
+
+    scenes.push({
+        ms: 2400,
+        html: `
+            <div class="reel-scene">
+                <div class="reel-kicker">Sunday Progress Check</div>
+                <div class="reel-big reel-pop">Let's see how ${name} did!</div>
+                <div class="reel-sparkles"><span class="reel-pop" style="--i:1">✨</span><span class="reel-pop" style="--i:2">🎉</span><span class="reel-pop" style="--i:3">✨</span></div>
+            </div>`
+    });
+
+    scenes.push({
+        ms: 3200,
+        html: `
+            <div class="reel-scene">
+                <div class="reel-stats-box">
+                    <div class="reel-stat reel-pop" style="--i:0">
+                        <div class="reel-stat-num" style="color:var(--mint);"><span data-count-to="${choresDone}">0</span><span class="reel-of">/${choresTotal}</span></div>
+                        <div class="reel-stat-label">Chores Done</div>
+                    </div>
+                    <div class="reel-stat reel-pop" style="--i:1">
+                        <div class="reel-stat-num" style="color:var(--coral);"><span data-count-to="${goalsDone}">0</span><span class="reel-of">/${goalsTotal}</span></div>
+                        <div class="reel-stat-label">Goals Done</div>
+                    </div>
+                </div>
+                <div class="reel-overall-bar"><div class="reel-overall-fill" style="--w:${Math.min(percent, 100)}%;"></div></div>
+                <div class="reel-caption reel-pop" style="--i:2">${percent}% of this week's targets</div>
+            </div>`,
+        onMount: token => {
+            document.querySelectorAll('#reel-stage [data-count-to]').forEach(el => {
+                animateCount(el, Number(el.dataset.countTo), 1200, token);
+            });
+        }
+    });
+
+    // Highlights: extra work first, then breakthroughs, then targets hit. Only habits with some progress.
+    const highlights = [
+        ...rows.filter(r => r.extra > 0).sort((a, b) => b.extra - a.extra).map(r => ({
+            row: r,
+            tag: `⭐ Above and beyond! ${r.done}/${r.target}, +${r.extra} extra`
+        })),
+        ...rows.filter(r => r.breakthrough && r.extra === 0).map(r => ({
+            row: r,
+            tag: `💪 Breakthrough! Last week ${r.lastDone}/${r.target}, this week ${r.done}/${r.target}`
+        })),
+        ...rows.filter(r => r.met && !r.breakthrough && r.extra === 0).map(r => ({
+            row: r,
+            tag: r.habit.type === 'goal' ? '🎯 Goal reached!' : '🧹 Chore target reached!'
+        }))
+    ].slice(0, 3);
+
+    highlights.forEach((item, idx) => {
+        const h = item.row.habit;
+        scenes.push({
+            ms: 2600,
+            html: `
+                <div class="reel-scene">
+                    <div class="reel-kicker">Highlight ${idx + 1} of ${highlights.length}</div>
+                    <div class="reel-highlight-emoji reel-bounce">${h.emoji || '✨'}</div>
+                    <div class="reel-highlight-name">${escapeHtml(h.name)}</div>
+                    <div class="reel-highlight-score reel-pop" style="--i:1">${item.row.done}/${item.row.target} done</div>
+                    <div class="reel-tag reel-pop" style="--i:2">${item.tag}</div>
+                </div>`,
+            onMount: () => playSuccessChime()
+        });
+    });
+
+    const praises = affirmationsData.meetingReel || ["Outstanding effort this week!"];
+    const praise = praises[Math.floor(Math.random() * praises.length)];
+
+    let encouragement;
+    if (rows.length === 0) {
+        encouragement = `No tasks yet, ${name}. Add some from the Task Bank and we'll cheer you on next week!`;
+    } else if (allMet && anyExtra) {
+        encouragement = `You hit every target and went the extra mile, ${name}!`;
+    } else if (allMet) {
+        encouragement = `Every target hit this week, ${name}. Amazing!`;
+    } else if (percent >= 60) {
+        encouragement = `Solid week, ${name}! Pick one thing to push a little further next week.`;
+    } else if (totalDone > 0) {
+        encouragement = `Every step counts, ${name}. Next week is a fresh start!`;
+    } else {
+        encouragement = `A fresh week is ahead, ${name}. We're cheering you on!`;
+    }
+
+    scenes.push({
+        ms: 4200,
+        html: `
+            <div class="reel-scene">
+                <div class="reel-praise reel-pop">"${escapeHtml(praise)}"</div>
+                <div class="reel-caption reel-pop" style="--i:1">${encouragement}</div>
+            </div>`,
+        onMount: () => burstConfetti()
+    });
+
+    return scenes;
 }
 
 function showNextReel() {
@@ -1247,55 +1423,75 @@ function showNextReel() {
     }
 
     const member = familyMembers[reelIndex];
-    playFanfare();
-
     $('reel-avatar').textContent = member.avatar;
     $('reel-name').textContent = member.name;
     $('reel-card').style.borderColor = member.color || 'var(--ink)';
 
-    const memberHabitsList = allHabits.filter(h => h.is_active !== false && h.member_name === member.name);
-    const chores = memberHabitsList.filter(h => h.type === 'chore');
-    const goals = memberHabitsList.filter(h => h.type === 'goal');
+    reelScenes = buildReelScenes(member);
+    reelSceneIndex = 0;
+    playFanfare();
+    playReelScene();
+}
 
-    let choresDone = 0;
-    let choresTarget = 0;
-    chores.forEach(c => {
-        choresTarget += c.target_count || 7;
-        choresDone += allCompletions.filter(comp => comp.habit_id === c.id).length;
-    });
-
-    let goalsDone = 0;
-    let goalsTarget = 0;
-    goals.forEach(g => {
-        goalsTarget += g.target_count || 3;
-        goalsDone += allCompletions.filter(comp => comp.habit_id === g.id).length;
-    });
-
-    $('reel-chores-stat').textContent = `${choresDone}/${choresTarget}`;
-    $('reel-goals-stat').textContent = `${goalsDone}/${goalsTarget}`;
-
-    const praises = affirmationsData.meetingReel || ["Outstanding effort this week!"];
-    const praise = praises[Math.floor(Math.random() * praises.length)];
-    $('reel-praise').textContent = `"${praise}"`;
-
-    reelElapsedMs = 0;
-    $('reel-timer-fill').style.width = '0%';
+function playReelScene() {
     clearInterval(reelProgressTimer);
+    const scene = reelScenes[reelSceneIndex];
+    reelSceneToken++;
+    reelSceneMs = scene.ms;
+    reelElapsedMs = 0;
 
-    const stepMs = 100;
+    $('reel-stage').innerHTML = scene.html;
+    $('reel-timer-fill').style.width = '0%';
+    if (scene.onMount) scene.onMount(reelSceneToken);
+
     reelProgressTimer = setInterval(() => {
-        if (!reelPaused) {
-            reelElapsedMs += stepMs;
-            const pct = Math.min((reelElapsedMs / REEL_DURATION_MS) * 100, 100);
-            $('reel-timer-fill').style.width = `${pct}%`;
+        if (reelPaused) return;
+        reelElapsedMs += REEL_STEP_MS;
+        const pct = Math.min((reelElapsedMs / reelSceneMs) * 100, 100);
+        $('reel-timer-fill').style.width = `${pct}%`;
 
-            if (reelElapsedMs >= REEL_DURATION_MS) {
-                clearInterval(reelProgressTimer);
-                reelIndex++;
-                showNextReel();
-            }
+        if (reelElapsedMs >= reelSceneMs) {
+            advanceReel();
         }
-    }, stepMs);
+    }, REEL_STEP_MS);
+}
+
+function advanceReel() {
+    clearInterval(reelProgressTimer);
+    reelSceneIndex++;
+    if (reelSceneIndex < reelScenes.length) {
+        playReelScene();
+    } else {
+        reelIndex++;
+        showNextReel();
+    }
+}
+
+// Counts a number up on screen. Stops early if the scene has changed.
+function animateCount(el, to, durationMs, token) {
+    const start = performance.now();
+    const step = now => {
+        if (token !== reelSceneToken) return;
+        const progress = Math.min((now - start) / durationMs, 1);
+        el.textContent = Math.round(to * progress);
+        if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+}
+
+// Confetti pieces fall over the stage and remove themselves when finished.
+function burstConfetti() {
+    const stage = $('reel-stage');
+    for (let i = 0; i < 36; i++) {
+        const piece = document.createElement('span');
+        piece.className = 'reel-confetti';
+        piece.style.left = `${Math.random() * 100}%`;
+        piece.style.background = COLOR_OPTIONS[i % COLOR_OPTIONS.length];
+        piece.style.animationDelay = `${Math.random() * 0.6}s`;
+        piece.style.setProperty('--drift', `${(Math.random() - 0.5) * 120}px`);
+        piece.addEventListener('animationend', () => piece.remove());
+        stage.appendChild(piece);
+    }
 }
 
 function showComparisonBoard() {
