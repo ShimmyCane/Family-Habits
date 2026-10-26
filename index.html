@@ -425,6 +425,7 @@
 
         .badge-chores { background: var(--mint); transform: rotate(-1deg); }
         .badge-goals { background: var(--pink); color: #fff; transform: rotate(1deg); }
+        .badge-bonus { background: var(--sun); color: var(--ink); transform: rotate(-1deg); }
 
         /* Habit Row Item */
         .habit-card {
@@ -524,6 +525,11 @@
         }
 
         .check-bubble.goal-checked {
+            background: var(--sun);
+        }
+
+        /* Bonus ticket: placeholder styling, restyle freely */
+        .check-bubble.bonus-checked {
             background: var(--sun);
         }
 
@@ -1130,6 +1136,15 @@
             <div id="goals-list">
                 <!-- Goal rows -->
             </div>
+
+            <!-- Bonus Tickets Section: no target, never changes the percent -->
+            <div class="section-header" style="margin-top:28px;">
+                <span class="section-badge badge-bonus">⭐ Bonus Tickets</span>
+                <span id="bonus-count" style="font-size:14px;color:#666;"></span>
+            </div>
+            <div id="bonus-list">
+                <!-- Bonus rows -->
+            </div>
         </div>
 
         <!-- VIEW 3: SUNDAY MEETING & CELEBRATION REEL -->
@@ -1214,6 +1229,7 @@
                     <select id="habit-type">
                         <option value="chore">🧹 Chore (Routine / Responsibility)</option>
                         <option value="goal">🎯 Goal (Aspirational / Habit)</option>
+                        <option value="bonus">⭐ Bonus (Stretch: no target)</option>
                     </select>
 
                     <label for="habit-name">Name</label>
@@ -1225,15 +1241,17 @@
                     <label for="habit-desc">Description (Optional)</label>
                     <input type="text" id="habit-desc" placeholder="Helpful details or motivation">
 
-                    <label for="habit-freq">Goal Frequency</label>
-                    <select id="habit-freq">
-                        <option value="daily">Daily (7 days / week)</option>
-                        <option value="x_days_week">X days per week</option>
-                        <option value="x_days_month">X days per month</option>
-                    </select>
+                    <div id="habit-target-fields">
+                        <label for="habit-freq">Goal Frequency</label>
+                        <select id="habit-freq">
+                            <option value="daily">Daily (7 days / week)</option>
+                            <option value="x_days_week">X days per week</option>
+                            <option value="x_days_month">X days per month</option>
+                        </select>
 
-                    <label for="habit-target">Target Count</label>
-                    <input type="number" id="habit-target" min="1" max="31" value="7" required>
+                        <label for="habit-target">Target Count</label>
+                        <input type="number" id="habit-target" min="1" max="31" value="7" required>
+                    </div>
 
                     <button type="submit" id="task-modal-submit" class="btn btn-primary" style="width:100%;margin-top:12px;">Save Task ✨</button>
                 </form>
