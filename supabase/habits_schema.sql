@@ -36,7 +36,7 @@ create table if not exists public.habits (
     name              text not null,
     description       text,
     emoji             text not null default '✨',
-    type              text not null default 'chore' check (type in ('chore', 'goal')),
+    type              text not null default 'chore' check (type in ('chore', 'goal', 'bonus')),
     target_frequency  text not null default 'daily'
                       check (target_frequency in ('daily', 'x_days_week', 'x_days_month')),
     target_count      integer not null default 7,

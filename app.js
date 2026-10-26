@@ -37,6 +37,7 @@ let familyMembers = [...DEFAULT_MEMBERS];
 let allHabits = []; // all habits (both active and bank/inactive)
 let memberHabits = [];
 let allCompletions = [];
+let allBonusCompletions = []; // bonus completions from every week, for the all-time count
 let currentWeeklyReflection = '';
 let soundEnabled = localStorage.getItem('soundEnabled') !== 'false';
 let gracePeriodDays = parseInt(localStorage.getItem('gracePeriodDays'), 10) || 14;
@@ -332,12 +333,31 @@ async function loadAllData() {
             allCompletions = compData || [];
         }
 
+        // Bonus tickets are counted all time, so load their completions without the week filter
+        const bonusIds = allHabits.filter(h => h.type === 'bonus').map(h => h.id);
+        if (bonusIds.length > 0) {
+            const { data: bonusData, error: bonusError } = await _supabase
+                .from('habit_completions')
+                .select('*')
+                .in('habit_id', bonusIds);
+
+            if (bonusError) {
+                console.warn('Error loading bonus completions:', bonusError.message);
+                allBonusCompletions = [];
+            } else {
+                allBonusCompletions = bonusData || [];
+            }
+        } else {
+            allBonusCompletions = [];
+        }
+
         await loadWeeklyReflection(startDate);
 
     } catch (e) {
         showError('Network/DB Exception: ' + e.message);
         allHabits = [];
         allCompletions = [];
+        allBonusCompletions = [];
     }
 
     // Active habits carry over indefinitely
@@ -450,19 +470,38 @@ function renderCurrentView() {
 // ------------------------------------------------------------------------------
 // VIEW 1: FRONT PAGE / HOME DASHBOARD
 // ------------------------------------------------------------------------------
+// Target for one task. Bonus tickets have no target. Checked explicitly because
+// 0 is falsy, so `target_count || default` would turn a 0 into a 7 or a 3.
+function habitTarget(habit) {
+    if (habit.type === 'bonus') return 0;
+    return habit.target_count || (habit.target_frequency === 'daily' ? 7 : 3);
+}
+
 // Weekly score for one member. Every completion counts, including extra ones
 // (bonuses), so extra work on one task can make up for a shortfall on another.
-// The percent can go above 100.
+// The percent can go above 100. Bonus tickets are left out here: they are
+// tallied separately by memberBonus, so they never change the target or percent.
 function memberWeekScore(memberName) {
-    const memberHabitsList = allHabits.filter(h => h.is_active !== false && h.member_name === memberName);
+    const memberHabitsList = allHabits.filter(h => h.is_active !== false && h.member_name === memberName && h.type !== 'bonus');
     let done = 0;
     let target = 0;
     memberHabitsList.forEach(habit => {
-        target += habit.target_count || (habit.target_frequency === 'daily' ? 7 : 3);
+        target += habitTarget(habit);
         done += allCompletions.filter(c => c.habit_id === habit.id).length;
     });
     const percent = target > 0 ? Math.round((done / target) * 100) : 0;
     return { done, target, percent };
+}
+
+// Bonus tickets for one member: count this week and all time.
+function memberBonus(memberName) {
+    const ids = allHabits
+        .filter(h => h.is_active !== false && h.member_name === memberName && h.type === 'bonus')
+        .map(h => h.id);
+    return {
+        week: allCompletions.filter(c => ids.includes(c.habit_id)).length,
+        total: allBonusCompletions.filter(c => ids.includes(c.habit_id)).length
+    };
 }
 
 function renderHomeView() {
@@ -476,6 +515,7 @@ function renderHomeView() {
 
     familyMembers.forEach(member => {
         const { done, target, percent } = memberWeekScore(member.name);
+        const bonus = memberBonus(member.name);
         const badges = calculateMemberBadges(member.name);
 
         const card = document.createElement('div');
@@ -491,7 +531,7 @@ function renderHomeView() {
             <div class="progress-bar-container">
                 <div class="progress-bar-fill" style="width:${Math.min(percent, 100)}%; background-color:${member.color || 'var(--mint)'};"></div>
             </div>
-            <div class="card-stat-text">${done}/${target} done (${percent}%)</div>
+            <div class="card-stat-text">${done}/${target} done (${percent}%)${bonus.week > 0 ? ` · ⭐ ${bonus.week} bonus` : ''}</div>
         `;
 
         card.addEventListener('click', () => {
@@ -577,15 +617,19 @@ function renderWeek() {
 function renderHabitLists() {
     const choresList = $('chores-list');
     const goalsList = $('goals-list');
+    const bonusList = $('bonus-list');
     choresList.innerHTML = '';
     goalsList.innerHTML = '';
+    bonusList.innerHTML = '';
 
     const week = getWeekDates(weekOffset);
     const chores = memberHabits.filter(h => h.type === 'chore');
     const goals = memberHabits.filter(h => h.type === 'goal');
+    const bonuses = memberHabits.filter(h => h.type === 'bonus');
 
     $('chores-count').textContent = `${chores.length} active`;
     $('goals-count').textContent = `${goals.length} active`;
+    $('bonus-count').textContent = `${bonuses.length} active`;
 
     if (chores.length === 0) {
         choresList.innerHTML = '<div class="card" style="text-align:center;padding:16px;color:#777;font-family:\'Patrick Hand\',cursive;font-size:18px;">No chores assigned yet. Tap "+ Add Task" or pick from the Task Bank!</div>';
@@ -598,6 +642,12 @@ function renderHabitLists() {
     } else {
         goals.forEach(goal => goalsList.appendChild(createHabitCard(goal, week)));
     }
+
+    if (bonuses.length === 0) {
+        bonusList.innerHTML = '<div class="card" style="text-align:center;padding:16px;color:#777;font-family:\'Patrick Hand\',cursive;font-size:18px;">No bonus tickets yet. Add one with Type: Bonus (Stretch) and it will have no target.</div>';
+    } else {
+        bonuses.forEach(bonus => bonusList.appendChild(createHabitCard(bonus, week)));
+    }
 }
 
 function createHabitCard(habit, week) {
@@ -608,7 +658,11 @@ function createHabitCard(habit, week) {
     const weekIsoDates = week.map(d => d.iso);
     const habitCompletionsThisWeek = allCompletions.filter(c => c.habit_id === habit.id && weekIsoDates.includes(c.completed_date));
     const completedCount = habitCompletionsThisWeek.length;
-    const targetCount = habit.target_count || (habit.target_frequency === 'daily' ? 7 : 3);
+    const targetCount = habitTarget(habit);
+    const isBonus = habit.type === 'bonus';
+    const countPill = isBonus
+        ? `<span class="streak-pill">⭐ ${allBonusCompletions.filter(c => c.habit_id === habit.id).length} all time</span>`
+        : `<span class="streak-pill">${completedCount}/${targetCount} done</span>`;
 
     // Header info
     const topRow = document.createElement('div');
@@ -623,7 +677,7 @@ function createHabitCard(habit, week) {
             </div>
         </div>
         <div class="habit-actions-right">
-            <span class="streak-pill">${completedCount}/${targetCount} done</span>
+            ${countPill}
             <button class="icon-btn edit-habit-btn" title="Edit Task">✏️</button>
             <button class="icon-btn delete-habit-btn" title="Remove to Task Bank">🗑️</button>
         </div>
@@ -653,7 +707,9 @@ function createHabitCard(habit, week) {
         const isDone = allCompletions.some(c => c.habit_id === habit.id && c.completed_date === day.iso);
         const bubble = document.createElement('div');
         const isGoal = habit.type === 'goal';
-        bubble.className = 'check-bubble' + (isDone ? (isGoal ? ' checked goal-checked' : ' checked') : '');
+        let doneClass = '';
+        if (isDone) doneClass = isBonus ? ' checked bonus-checked' : (isGoal ? ' checked goal-checked' : ' checked');
+        bubble.className = 'check-bubble' + doneClass;
         bubble.innerHTML = isDone ? '⭐' : '';
         bubble.title = `${day.name} (${day.iso})`;
 
@@ -682,6 +738,7 @@ async function toggleCompletion(habit, dateIso, currentlyDone) {
             cheer_emoji: '😊'
         };
         allCompletions.push(newRecord);
+        if (habit.type === 'bonus') allBonusCompletions.push(newRecord);
         playSuccessChime();
 
         const list = (habit.type === 'chore' ? affirmationsData.chores : affirmationsData.goals) || affirmationsData.general;
@@ -695,6 +752,7 @@ async function toggleCompletion(habit, dateIso, currentlyDone) {
             if (error) {
                 showError('Could not save completion to cloud: ' + error.message);
                 allCompletions = allCompletions.filter(c => !(c.habit_id === habit.id && c.completed_date === dateIso));
+                allBonusCompletions = allBonusCompletions.filter(c => !(c.habit_id === habit.id && c.completed_date === dateIso));
                 renderHabitLists();
                 updateBanner();
             }
@@ -703,6 +761,7 @@ async function toggleCompletion(habit, dateIso, currentlyDone) {
         }
     } else {
         allCompletions = allCompletions.filter(c => !(c.habit_id === habit.id && c.completed_date === dateIso));
+        allBonusCompletions = allBonusCompletions.filter(c => !(c.habit_id === habit.id && c.completed_date === dateIso));
         renderHabitLists();
         updateBanner();
 
@@ -739,8 +798,16 @@ function openEditHabitModal(habit) {
     $('habit-desc').value = habit.description || '';
     $('habit-freq').value = habit.target_frequency || 'daily';
     $('habit-target').value = habit.target_count || 7;
+    updateHabitFormFields();
 
     $('add-modal').style.display = 'flex';
+}
+
+// Bonus tickets have no frequency or target, so hide those fields and don't require them
+function updateHabitFormFields() {
+    const isBonus = $('habit-type').value === 'bonus';
+    $('habit-target-fields').style.display = isBonus ? 'none' : 'block';
+    $('habit-target').required = !isBonus;
 }
 
 function openAddHabitModal() {
@@ -750,6 +817,7 @@ function openAddHabitModal() {
     $('task-modal-submit').textContent = 'Save Task ✨';
     $('new-habit-form').reset();
     $('habit-member').value = currentMember;
+    updateHabitFormFields();
     $('add-modal').style.display = 'flex';
 }
 
@@ -763,8 +831,9 @@ async function handleHabitFormSubmit(e) {
     const habitName = $('habit-name').value.trim();
     const habitEmoji = $('habit-emoji').value.trim() || '✨';
     const habitDesc = $('habit-desc').value.trim();
-    const habitFreq = $('habit-freq').value;
-    const habitTarget = parseInt($('habit-target').value, 10) || 7;
+    const isBonus = habitType === 'bonus';
+    const habitFreq = isBonus ? 'daily' : $('habit-freq').value;
+    const habitTargetCount = isBonus ? 0 : (parseInt($('habit-target').value, 10) || 7);
 
     if (!habitName) return;
 
@@ -776,7 +845,7 @@ async function handleHabitFormSubmit(e) {
             emoji: habitEmoji,
             description: habitDesc,
             target_frequency: habitFreq,
-            target_count: habitTarget
+            target_count: habitTargetCount
         };
 
         const idx = allHabits.findIndex(h => h.id === editId);
@@ -809,7 +878,7 @@ async function handleHabitFormSubmit(e) {
             emoji: habitEmoji,
             description: habitDesc,
             target_frequency: habitFreq,
-            target_count: habitTarget,
+            target_count: habitTargetCount,
             is_active: true
         };
 
@@ -935,7 +1004,7 @@ function getUniqueBankTasks() {
                 type: habit.type || 'chore',
                 description: habit.description || '',
                 target_frequency: habit.target_frequency || 'daily',
-                target_count: habit.target_count || 7,
+                target_count: habit.type === 'bonus' ? 0 : (habit.target_count || 7),
                 activeMembers: [],
                 inactiveMembers: [],
                 habitIds: [],
@@ -1019,8 +1088,8 @@ function renderTaskBank(filterQuery = bankFilterQuery) {
         card.style.boxShadow = '3px 3px 0 var(--ink)';
         card.style.position = 'relative';
 
-        const typeBadge = task.type === 'chore' ? '🧹 Chore' : '🎯 Goal';
-        const freqBadge = task.target_frequency === 'daily' ? 'Daily' : `${task.target_count}x/wk`;
+        const typeBadge = task.type === 'chore' ? '🧹 Chore' : task.type === 'bonus' ? '⭐ Bonus' : '🎯 Goal';
+        const freqBadge = task.type === 'bonus' ? 'No target' : task.target_frequency === 'daily' ? 'Daily' : `${task.target_count}x/wk`;
 
         // Active members summary
         let activeBadgesHtml = '';
@@ -1277,15 +1346,11 @@ function shiftIsoDate(iso, days) {
     return d.toISOString().slice(0, 10);
 }
 
-// Mirrors the target shown on each habit card
-function habitTarget(habit) {
-    return habit.target_count || (habit.target_frequency === 'daily' ? 7 : 3);
-}
-
 // Builds the sequence of scenes for one person: intro, tally, up to three highlights, encouragement.
 function buildReelScenes(member) {
     const currentStart = getWeekDates(weekOffset)[0].iso;
-    const memberHabitsList = allHabits.filter(h => h.is_active !== false && h.member_name === member.name);
+    const memberHabitsList = allHabits.filter(h => h.is_active !== false && h.member_name === member.name && h.type !== 'bonus');
+    const hasTasks = allHabits.some(h => h.is_active !== false && h.member_name === member.name);
 
     const rows = memberHabitsList.map(habit => {
         const done = allCompletions.filter(c => c.habit_id === habit.id).length;
@@ -1356,7 +1421,18 @@ function buildReelScenes(member) {
     });
 
     // Highlights: extra work first, then breakthroughs, then targets hit. Only habits with some progress.
+    // Bonus tickets earned this week come first: they are rare, so they should be the highlight.
+    const bonusHighlights = allHabits
+        .filter(h => h.is_active !== false && h.member_name === member.name && h.type === 'bonus')
+        .map(h => ({ habit: h, count: allCompletions.filter(c => c.habit_id === h.id).length }))
+        .filter(b => b.count > 0)
+        .map(b => ({
+            row: { habit: b.habit, done: b.count, target: 0 },
+            tag: '🏆 Bonus ticket earned!'
+        }));
+
     const highlights = [
+        ...bonusHighlights,
         ...rows.filter(r => r.extra > 0).sort((a, b) => b.extra - a.extra).map(r => ({
             row: r,
             tag: `⭐ Above and beyond! ${r.done}/${r.target}, +${r.extra} extra`
@@ -1380,7 +1456,7 @@ function buildReelScenes(member) {
                     <div class="reel-kicker">Highlight ${idx + 1} of ${highlights.length}</div>
                     <div class="reel-highlight-emoji reel-bounce">${h.emoji || '✨'}</div>
                     <div class="reel-highlight-name">${escapeHtml(h.name)}</div>
-                    <div class="reel-highlight-score reel-pop" style="--i:1">${item.row.done}/${item.row.target} done</div>
+                    <div class="reel-highlight-score reel-pop" style="--i:1">${h.type === 'bonus' ? `${item.row.done} this week` : `${item.row.done}/${item.row.target} done`}</div>
                     <div class="reel-tag reel-pop" style="--i:2">${item.tag}</div>
                 </div>`,
             onMount: () => playSuccessChime()
@@ -1391,7 +1467,7 @@ function buildReelScenes(member) {
     const praise = praises[Math.floor(Math.random() * praises.length)];
 
     let encouragement;
-    if (rows.length === 0) {
+    if (!hasTasks) {
         encouragement = `No tasks yet, ${name}. Add some from the Task Bank and we'll cheer you on next week!`;
     } else if (allMet && anyExtra) {
         encouragement = `You hit every target and went the extra mile, ${name}!`;
@@ -1554,8 +1630,10 @@ function showComparisonBoard() {
         let habitsHtml = '';
         mHabits.forEach(h => {
             const doneCount = allCompletions.filter(c => c.habit_id === h.id).length;
-            const target = h.target_count || 7;
-            const badge = h.type === 'chore' ? '🧹 Chore' : '🎯 Goal';
+            const badge = h.type === 'chore' ? '🧹 Chore' : h.type === 'bonus' ? '⭐ Bonus' : '🎯 Goal';
+            const countText = h.type === 'bonus'
+                ? `${doneCount} this week · ${allBonusCompletions.filter(c => c.habit_id === h.id).length} all time`
+                : `${doneCount}/${habitTarget(h)} done`;
             habitsHtml += `
                 <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed #ddd;">
                     <div>
@@ -1563,7 +1641,7 @@ function showComparisonBoard() {
                         <strong>${escapeHtml(h.name)}</strong>
                         <span style="font-size:12px;color:#777;margin-left:6px;">(${badge})</span>
                     </div>
-                    <span class="streak-pill" style="font-size:12px;">${doneCount}/${target} done</span>
+                    <span class="streak-pill" style="font-size:12px;">${countText}</span>
                 </div>
             `;
         });
@@ -1652,8 +1730,8 @@ function triggerFridgePrint() {
         } else {
             mHabits.forEach(h => {
                 const tr = document.createElement('tr');
-                const targetText = h.target_frequency === 'daily' ? 'Daily' : `${h.target_count}x/wk`;
-                const typeText = h.type === 'chore' ? '🧹 Chore' : '🎯 Goal';
+                const targetText = h.type === 'bonus' ? 'No target' : h.target_frequency === 'daily' ? 'Daily' : `${h.target_count}x/wk`;
+                const typeText = h.type === 'chore' ? '🧹 Chore' : h.type === 'bonus' ? '⭐ Bonus' : '🎯 Goal';
 
                 tr.innerHTML = `
                     <td><strong>${h.emoji} ${escapeHtml(h.name)}</strong></td>
@@ -1930,6 +2008,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         $('add-modal').style.display = 'none';
     });
     $('new-habit-form').addEventListener('submit', handleHabitFormSubmit);
+    $('habit-type').addEventListener('change', updateHabitFormFields);
 
     // Open Task Bank from Add Modal
     $('open-bank-from-add-btn').addEventListener('click', () => {
