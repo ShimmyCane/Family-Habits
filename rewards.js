@@ -67,9 +67,9 @@ function memberEmoji(memberName) {
     return member ? (member.avatar || '👤') : '🏡';
 }
 
-// Every task a person has, including bonus tickets, so a reward can link to any of them
+// Every task a person has, including bonus tickets and archived ones, so a reward can link to any of them
 function linkableHabitsFor(memberName) {
-    return allHabits.filter(h => h.is_active !== false && h.member_name === memberName);
+    return allHabits.filter(h => h.member_name === memberName);
 }
 
 // Emoji for a reward that has none set: the first linked task's emoji, else a gift
@@ -514,7 +514,7 @@ function syncRewardFormKind() {
 function populateReqHabits() {
     const habits = linkableHabitsFor($('req-member').value);
     $('req-habit').innerHTML = habits.length
-        ? habits.map(h => `<option value="${h.id}">${escapeHtml(h.emoji || '')} ${escapeHtml(h.name)}</option>`).join('')
+        ? habits.map(h => `<option value="${h.id}">${escapeHtml(h.emoji || '')} ${escapeHtml(h.name)}${h.is_active === false ? ' (archived)' : ''}</option>`).join('')
         : '<option value="">No tasks for this person</option>';
     if (habits.length) $('req-count').value = Math.max(1, habitTarget(habits[0]));
 }
