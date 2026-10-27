@@ -62,6 +62,7 @@ create table if not exists public.reward_awards (
     note          text,
     cashed_on     date,
     voided        boolean not null default false,
+    suggested_amount numeric(12,2) check (suggested_amount >= 0),
     created_at    timestamptz not null default timezone('utc', now()),
     constraint reward_awards_period_check check (period_end >= period_start)
 );
