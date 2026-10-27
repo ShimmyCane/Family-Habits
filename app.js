@@ -360,6 +360,8 @@ async function loadAllData() {
         allBonusCompletions = [];
     }
 
+    await loadRewardData();
+
     // Active habits carry over indefinitely
     memberHabits = allHabits.filter(h => h.is_active !== false && h.member_name === currentMember);
     renderCurrentView();
@@ -445,6 +447,7 @@ function switchView(viewName) {
     $('home-view').style.display = viewName === 'home' ? 'block' : 'none';
     $('member-view').style.display = viewName === 'member' ? 'block' : 'none';
     $('meeting-view').style.display = viewName === 'meeting' ? 'block' : 'none';
+    $('rewards-view').style.display = viewName === 'rewards' ? 'block' : 'none';
 
     if (viewName === 'home') {
         renderHomeView();
@@ -454,6 +457,8 @@ function switchView(viewName) {
         renderHabitLists();
     } else if (viewName === 'meeting') {
         startSundayMeeting();
+    } else if (viewName === 'rewards') {
+        renderRewardsPage();
     }
 }
 
@@ -464,6 +469,8 @@ function renderCurrentView() {
         renderMemberPicker();
         renderWeek();
         renderHabitLists();
+    } else if (currentView === 'rewards') {
+        renderRewardsPage();
     }
 }
 
@@ -543,6 +550,8 @@ function renderHomeView() {
 
         container.appendChild(card);
     });
+
+    renderHomeRewards();
 }
 
 // ------------------------------------------------------------------------------
@@ -739,6 +748,7 @@ async function toggleCompletion(habit, dateIso, currentlyDone) {
         };
         allCompletions.push(newRecord);
         if (habit.type === 'bonus') allBonusCompletions.push(newRecord);
+        allHabitCompletions.push(newRecord);
         playSuccessChime();
 
         const list = (habit.type === 'chore' ? affirmationsData.chores : affirmationsData.goals) || affirmationsData.general;
@@ -753,6 +763,7 @@ async function toggleCompletion(habit, dateIso, currentlyDone) {
                 showError('Could not save completion to cloud: ' + error.message);
                 allCompletions = allCompletions.filter(c => !(c.habit_id === habit.id && c.completed_date === dateIso));
                 allBonusCompletions = allBonusCompletions.filter(c => !(c.habit_id === habit.id && c.completed_date === dateIso));
+                allHabitCompletions = allHabitCompletions.filter(c => !(c.habit_id === habit.id && c.completed_date === dateIso));
                 renderHabitLists();
                 updateBanner();
             }
@@ -760,6 +771,7 @@ async function toggleCompletion(habit, dateIso, currentlyDone) {
             showError('Cloud save error: ' + e.message);
         }
     } else {
+        allHabitCompletions = allHabitCompletions.filter(c => !(c.habit_id === habit.id && c.completed_date === dateIso));
         allCompletions = allCompletions.filter(c => !(c.habit_id === habit.id && c.completed_date === dateIso));
         allBonusCompletions = allBonusCompletions.filter(c => !(c.habit_id === habit.id && c.completed_date === dateIso));
         renderHabitLists();
@@ -1971,6 +1983,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     await loadAllData();
 
     initProfileCustomizer();
+    initRewards();
 
     // Navigation
     $('home-nav-title').addEventListener('click', () => {

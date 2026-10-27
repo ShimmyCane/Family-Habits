@@ -1010,6 +1010,34 @@
                 padding: 6px;
             }
         }
+        /* Rewards */
+        .badge-rewards { background: var(--grape); color: #fff; transform: rotate(-1deg); }
+        .home-rewards { margin-bottom: 20px; }
+        .reward-card { background: #fff; border: 3px solid var(--ink); border-radius: 20px; box-shadow: 4px 4px 0 var(--ink); padding: 14px 16px; margin-bottom: 14px; }
+        .reward-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+        .reward-card-name { font-size: 18px; font-weight: 800; text-transform: uppercase; }
+        .reward-desc { font-family: 'Patrick Hand', cursive; font-size: 17px; color: #555; margin: 4px 0; }
+        .reward-req { font-size: 13px; color: #555; margin-top: 4px; }
+        .reward-suggest { font-size: 13px; color: #555; margin-top: 2px; }
+        .reward-ready { background: #fffdf0; }
+        .reward-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 2px dashed #ddd; flex-wrap: wrap; }
+        .reward-row:first-of-type { border-top: none; }
+        .reward-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+        .reward-pill { display: inline-block; font-size: 11px; font-weight: 800; text-transform: uppercase; border: 1.5px solid var(--ink); border-radius: 8px; padding: 1px 6px; margin-left: 6px; background: #eee; }
+        .reward-pill.ready { background: var(--sun); }
+        .reward-pill.cashed, .reward-pill.published { background: var(--mint); }
+        .reward-pill.draft { background: #fff; }
+        .reward-pill.voided, .reward-pill.archived { background: #ddd; }
+        .reward-empty, .reward-note { font-family: 'Patrick Hand', cursive; font-size: 17px; color: #555; text-align: center; padding: 14px; }
+        .reward-req-list { margin: 0 0 10px; padding: 0; list-style: none; }
+        .reward-req-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: var(--paper); border: 2px solid var(--ink); border-radius: 10px; padding: 6px 10px; margin-bottom: 6px; font-size: 14px; }
+        .rewards-topbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+        .rewards-title { margin: 0; font-size: 20px; text-transform: uppercase; }
+        .rewards-intro { font-family: 'Patrick Hand', cursive; font-size: 17px; color: #555; margin: 0 0 16px; }
+        .rewards-filter { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+        .rewards-filter .btn.active { background: var(--sun); }
+        .reward-form-error { color: #900; font-size: 14px; min-height: 18px; margin: 0 0 8px; }
+        .reward-field-hint { font-size: 12px; color: #555; margin: 0 0 8px; }
     </style>
 </head>
 <body>
@@ -1080,6 +1108,11 @@
 
             <div class="family-summary-grid" id="home-summary-grid">
                 <!-- Dynamically populated with Athena, Felix, Ying, Jimmy cards -->
+            </div>
+
+            <!-- Family Rewards: ready to cash in, then pinned progress -->
+            <div id="home-rewards" class="home-rewards">
+                <!-- Dynamically populated -->
             </div>
         </div>
 
@@ -1200,6 +1233,35 @@
                 <div id="breakdown-list">
                     <!-- Detailed cards for each member -->
                 </div>
+            </div>
+        </div>
+
+        <!-- VIEW 4: REWARDS (draft, publish, timeline and bank) -->
+        <div id="rewards-view" style="display:none;">
+            <div class="rewards-topbar">
+                <h2 class="rewards-title">🎁 Family Rewards</h2>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="btn btn-small btn-white" data-reward-action="home">🏠 Home</button>
+                    <button class="btn btn-small btn-primary" data-reward-action="new-reward">➕ New Reward</button>
+                </div>
+            </div>
+            <p class="rewards-intro">Pin rewards so everyone can see them. Each week is checked on its last day, and a finished week is kept in the timeline below.</p>
+
+            <div id="rewards-list">
+                <!-- Dynamically populated -->
+            </div>
+
+            <div class="section-header" style="margin-top:28px;">
+                <span class="section-badge badge-rewards">📜 Timeline & Bank</span>
+            </div>
+            <div class="rewards-filter" id="rewards-filter">
+                <!-- Dynamically populated -->
+            </div>
+            <div id="rewards-timeline">
+                <!-- Dynamically populated -->
+            </div>
+            <div style="margin-top:12px;">
+                <button class="btn btn-small btn-white" data-reward-action="add-award">➕ Add Past Award</button>
             </div>
         </div>
 
@@ -1357,11 +1419,119 @@
                     <div style="display:flex;flex-direction:column;gap:8px;">
                         <button id="toggle-sound-btn" class="btn btn-white" style="width:100%;justify-content:flex-start;">🔊 Sound Effects: ON</button>
                         <button id="settings-bank-btn" class="btn btn-white" style="width:100%;justify-content:flex-start;">📁 Task Bank & Working Folder</button>
+                        <button id="settings-rewards-btn" class="btn btn-white" data-reward-action="open-page" style="width:100%;justify-content:flex-start;">🎁 Rewards</button>
                         <button id="export-json-btn" class="btn btn-white" style="width:100%;justify-content:flex-start;">💾 Download All Data (JSON)</button>
                         <button id="settings-diag-btn" class="btn btn-white" style="width:100%;justify-content:flex-start;">🩺 Run Database Diagnostics</button>
                         <button id="settings-changelog-btn" class="btn btn-white" style="width:100%;justify-content:flex-start;">📜 Change Log &amp; To-do</button>
                         <button id="signout-btn" class="btn btn-primary" style="width:100%;">Sign Out</button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reward Editor Modal -->
+        <div class="modal-overlay" id="reward-modal">
+            <div class="modal-content">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <h2 id="reward-modal-title" style="margin:0;font-size:20px;text-transform:uppercase;">New Reward</h2>
+                    <button type="button" class="btn btn-small btn-white" style="min-height:30px;padding:2px 8px;" data-reward-action="close-modal" data-modal="reward-modal">✕</button>
+                </div>
+                <form id="reward-form" onsubmit="return false;">
+                    <label for="reward-name">Name</label>
+                    <input type="text" id="reward-name" placeholder="e.g. China buffet night" autocomplete="off">
+
+                    <label for="reward-description">Description (optional)</label>
+                    <textarea id="reward-description" rows="2" placeholder="Anything the kids should know"></textarea>
+
+                    <label for="reward-kind">Type</label>
+                    <select id="reward-kind">
+                        <option value="standard">Reward: met requirements</option>
+                        <option value="extra_credit">Extra credit: 1 unit for each completion above the target</option>
+                    </select>
+
+                    <div id="reward-who-field">
+                        <label for="reward-who">Who it's for</label>
+                        <select id="reward-who"></select>
+                    </div>
+
+                    <label for="reward-allowance">Suggested allowance (optional)</label>
+                    <input type="number" id="reward-allowance" min="0" step="0.01" value="0">
+                    <p class="reward-field-hint">A suggestion only. Parents decide how and when to pay it out.</p>
+
+                    <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:15px;">
+                        <input type="checkbox" id="reward-repeatable" checked style="width:auto;margin:0;">
+                        Repeats every week (uncheck for one time only)
+                    </label>
+                    <p class="reward-field-hint">Periods are weekly, Monday to Sunday.</p>
+
+                    <div style="border:2px solid var(--ink);border-radius:14px;padding:10px;margin:10px 0;background:var(--paper);">
+                        <strong style="font-size:14px;text-transform:uppercase;">Requirements (all must be met)</strong>
+                        <div id="req-list" style="margin-top:8px;"></div>
+
+                        <label for="req-type">Add a requirement</label>
+                        <select id="req-type">
+                            <option value="habit">A person's task, times a week</option>
+                            <option value="family">Everyone at a percent</option>
+                        </select>
+
+                        <div id="req-habit-fields">
+                            <label for="req-member">Person</label>
+                            <select id="req-member"></select>
+                            <label for="req-habit">Task</label>
+                            <select id="req-habit"></select>
+                            <label for="req-count">Times a week</label>
+                            <input type="number" id="req-count" min="1" value="3">
+                        </div>
+
+                        <div id="req-family-fields" style="display:none;">
+                            <label for="req-percent">Each person with tasks must reach</label>
+                            <input type="number" id="req-percent" min="1" max="100" value="100">
+                        </div>
+
+                        <button type="button" class="btn btn-small btn-white" data-reward-action="add-req">+ Add requirement</button>
+                    </div>
+
+                    <div id="reward-form-error" class="reward-form-error"></div>
+                    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+                        <button type="button" class="btn btn-small btn-white" data-reward-action="close-modal" data-modal="reward-modal">Cancel</button>
+                        <button type="button" class="btn btn-small btn-white" data-reward-action="save-draft">Save as Draft</button>
+                        <button type="button" class="btn btn-small btn-primary" data-reward-action="save-publish">Publish</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Award Editor Modal (add past award, correct, cash in, void) -->
+        <div class="modal-overlay" id="award-modal">
+            <div class="modal-content">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <h2 id="award-modal-title" style="margin:0;font-size:20px;text-transform:uppercase;">Edit Award</h2>
+                    <button type="button" class="btn btn-small btn-white" style="min-height:30px;padding:2px 8px;" data-reward-action="close-modal" data-modal="award-modal">✕</button>
+                </div>
+                <label for="award-reward">Reward</label>
+                <select id="award-reward"></select>
+
+                <label for="award-earned">Earned on</label>
+                <input type="date" id="award-earned">
+
+                <label for="award-units">Units</label>
+                <input type="number" id="award-units" min="1" value="1">
+
+                <label for="award-cashed">Cashed in on (leave blank if not cashed)</label>
+                <input type="date" id="award-cashed">
+
+                <label for="award-note">Note (optional)</label>
+                <input type="text" id="award-note" autocomplete="off">
+
+                <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:15px;">
+                    <input type="checkbox" id="award-voided" style="width:auto;margin:0;">
+                    Void (keep in the timeline, remove from the dashboard)
+                </label>
+
+                <div id="award-error" class="reward-form-error"></div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;">
+                    <button type="button" class="btn btn-small btn-white" data-reward-action="close-modal" data-modal="award-modal">Cancel</button>
+                    <button type="button" class="btn btn-small btn-primary" data-reward-action="save-award">Save</button>
                 </div>
             </div>
         </div>
@@ -1388,5 +1558,6 @@
     </div>
 
     <script src="app.js"></script>
+    <script src="rewards.js"></script>
 </body>
 </html>

@@ -18,7 +18,8 @@
     { "id": "T10", "priority": "low", "owner": "you", "area": "Family database", "item": "After the Allowances check (T1), tell Claude to drop the temporary legacy_id columns on the allowance tables." },
     { "id": "T11", "priority": "medium", "owner": "you", "area": "Family Habits", "item": "Confirm the scoring. Adding a task you haven't done yet still lowers the percentage. Say if you want that changed." },
     { "id": "T12", "priority": "low", "owner": "you", "area": "Family Habits", "item": "Check the member cards and scores on your phone or iPad. The tests ran in a desktop browser only." },
-    { "id": "T13", "priority": "low", "owner": "you", "area": "Allowances", "item": "Check the Allowances layout on an iPhone after the switch." }
+    { "id": "T13", "priority": "low", "owner": "you", "area": "Allowances", "item": "Check the Allowances layout on an iPhone after the switch." },
+    { "id": "T14", "priority": "high", "owner": "you", "area": "Family Habits", "item": "Run supabase/rewards_migration.sql in the Family project's SQL editor. Until it runs, the rewards section shows a setup note. It is safe to run more than once." }
   ],
   "versions": [
     { "version": "1.01", "date": "2026-09-19", "project": "AI notes", "title": "AI notes repo started", "summary": "Set up the ShimmyAI folder for plans, references and project notes.", "status": "notes" },
@@ -43,6 +44,7 @@
     { "version": "1.20", "date": "2026-10-23", "project": "Family database", "title": "Table index added", "summary": "app_table_registry records which app uses which table, with a view that lists anything unclaimed. The convention is saved in the AI notes. ShimmyAI PR #4.", "status": "live" },
     { "version": "1.21", "date": "2026-10-24", "project": "Family Habits", "title": "Habits schema snapshot", "summary": "Snapshot of the habit tables and their access rules, plus the data state (28 habits, 75 completions). Family Habits PR #2. Documentation only.", "status": "merged" },
     { "version": "1.22", "date": "2026-10-24", "project": "Family Habits", "title": "Member card and scoring fixes", "summary": "The first click on a member card now shows that member's habits. Scores count every completion, so bonuses can make up for shortfalls and the percentage can go above 100. Family Habits PR #3.", "status": "live" },
+    { "version": "1.24", "date": "2026-10-27", "project": "Family Habits", "title": "Family rewards", "summary": "Rewards are drafted and published from Settings, then pinned to the bottom of the home page with a progress bar. Each finished week a reward was met for is kept in a timeline, where it can be cashed in, corrected or voided. Allowance amounts are only suggestions. Database step: supabase/rewards_migration.sql (to-do T14).", "status": "merged" },
     { "version": "1.23", "date": "2026-10-26", "project": "Family Habits", "title": "Bonus tickets", "summary": "New Bonus (Stretch) task type with no target. Its completions are shown in their own section with a this-week count and an all-time count, and they never change the weekly target or percentage. Database check updated to allow the bonus type.", "status": "merged" },
     { "version": "1.23", "date": "2026-10-24", "project": "Family Habits", "title": "Change log and to-do page", "summary": "This page, opened from Settings. The to-do list shows what needs checking or chasing. Updated by hand when changes are merged.", "status": "merged" }
   ]
