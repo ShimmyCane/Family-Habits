@@ -166,7 +166,10 @@ function awardStatus(award) {
     return 'ready';
 }
 
+// The amount is copied onto the award when it is written, so changing a reward's rate later
+// does not change what past awards owe. Rows from before that copy fall back to the rate now.
 function awardSuggested(award) {
+    if (award.suggested_amount != null) return Number(award.suggested_amount) * award.units;
     const reward = rewardById(award.reward_id);
     return reward && reward.allowance_amount > 0 ? reward.allowance_amount * award.units : 0;
 }
@@ -237,6 +240,7 @@ async function syncRewardAwards() {
                 period_end: week.end,
                 earned_on: week.end,
                 units: result.units,
+                suggested_amount: reward.allowance_amount,
                 source: 'auto'
             }]);
             if (error && error.code !== '23505') {
@@ -682,6 +686,7 @@ async function saveAward() {
             period_end: week.end,
             earned_on: earned,
             units,
+            suggested_amount: reward.allowance_amount,
             source: 'manual',
             note,
             cashed_on: cashed,
