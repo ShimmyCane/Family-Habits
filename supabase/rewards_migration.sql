@@ -24,6 +24,7 @@
 create table if not exists public.rewards (
     id               uuid primary key default gen_random_uuid(),
     name             text not null,
+    emoji            text not null default '🎁',
     description      text,
     kind             text not null default 'standard'
                      check (kind in ('standard', 'extra_credit')),

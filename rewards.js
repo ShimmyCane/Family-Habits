@@ -61,6 +61,24 @@ function rewardById(id) {
     return rewards.find(r => r.id === id) || null;
 }
 
+// The avatar for a person, or a house for the whole family
+function memberEmoji(memberName) {
+    const member = memberName ? familyMembers.find(m => m.name === memberName) : null;
+    return member ? (member.avatar || '👤') : '🏡';
+}
+
+// Every task a person has, including bonus tickets and archived ones, so a reward can link to any of them
+function linkableHabitsFor(memberName) {
+    return allHabits.filter(h => h.member_name === memberName);
+}
+
+// Emoji for a reward that has none set: the first linked task's emoji, else a gift
+function fallbackRewardEmoji(requirements) {
+    const first = requirements.find(r => r.kind === 'habit');
+    const habit = first ? allHabits.find(h => h.id === first.habit_id) : null;
+    return (habit && habit.emoji) || '🎁';
+}
+
 function byEarnedDesc(a, b) {
     return b.earned_on.localeCompare(a.earned_on) || (b.created_at || '').localeCompare(a.created_at || '');
 }
@@ -300,6 +318,7 @@ function homeRewardCardHtml(reward, week) {
     const pct = Math.round(result.progress * 100);
     const owner = reward.member_name ? familyMembers.find(m => m.name === reward.member_name) : null;
     const color = owner && owner.color ? owner.color : 'var(--mint)';
+    const emoji = reward.emoji || '🎁';
 
     let status = `${pct}% this week`;
     if (result.met) {
@@ -315,8 +334,8 @@ function homeRewardCardHtml(reward, week) {
     return `
         <div class="reward-card">
             <div class="reward-card-head">
-                <span class="reward-card-name">${escapeHtml(reward.name)}</span>
-                <span class="badge-chip">${owner ? escapeHtml(owner.name) : 'Whole family'}</span>
+                <span class="reward-card-name">${emoji} ${escapeHtml(reward.name)}</span>
+                <span class="reward-owner" title="${owner ? escapeHtml(owner.name) : 'Whole family'}">${memberEmoji(reward.member_name)}</span>
             </div>
             ${reward.description ? `<div class="reward-desc">${escapeHtml(reward.description)}</div>` : ''}
             <div class="progress-bar-container">
@@ -342,7 +361,7 @@ function awardRowHtml(award) {
     const pillText = status === 'ready' ? 'Ready to cash'
         : status === 'cashed' ? `Cashed ${shortDate(award.cashed_on)}`
         : 'Voided';
-    const owner = award.member_name ? escapeHtml(award.member_name) : 'Whole family';
+    const owner = memberEmoji(award.member_name);
     const units = award.units > 1 ? ` ×${award.units}` : '';
     const amount = awardSuggested(award);
 
@@ -354,7 +373,7 @@ function awardRowHtml(award) {
     return `
         <div class="reward-row">
             <div>
-                <strong>${escapeHtml(name)}</strong>${units} · ${owner} · earned ${shortDate(award.earned_on)}
+                <strong>${reward ? reward.emoji || '🎁' : ''} ${escapeHtml(name)}</strong>${units} ${owner} · earned ${shortDate(award.earned_on)}
                 <span class="reward-pill ${status}">${pillText}</span>
                 ${amount > 0 ? `<div class="reward-suggest">${REWARD_SUGGESTION_NOTE}: ${formatMoney(amount)}</div>` : ''}
                 ${award.note ? `<div class="reward-suggest">${escapeHtml(award.note)}</div>` : ''}
@@ -390,7 +409,7 @@ function renderRewardsPage() {
 }
 
 function rewardManageCardHtml(reward) {
-    const owner = reward.member_name ? escapeHtml(reward.member_name) : 'Whole family';
+    const owner = memberEmoji(reward.member_name);
     const repeat = reward.kind === 'extra_credit' ? 'Extra credits each week'
         : reward.repeatable ? 'Repeats weekly' : 'One time only';
     const reqs = reward.requirements.map(r => escapeHtml(describeRequirement(r))).join('; ') || 'No requirements';
@@ -412,11 +431,12 @@ function rewardManageCardHtml(reward) {
     return `
         <div class="reward-card">
             <div class="reward-card-head">
-                <span class="reward-card-name">${escapeHtml(reward.name)}</span>
+                <span class="reward-card-name">${reward.emoji || '🎁'} ${escapeHtml(reward.name)}</span>
+                <span class="reward-owner" title="${reward.member_name ? escapeHtml(reward.member_name) : 'Whole family'}">${owner}</span>
                 <span class="reward-pill ${reward.status}">${reward.status}</span>
             </div>
             ${reward.description ? `<div class="reward-desc">${escapeHtml(reward.description)}</div>` : ''}
-            <div class="reward-req">For: ${owner} · Weekly · ${repeat}${pinNote}</div>
+            <div class="reward-req">Weekly · ${repeat}${pinNote}</div>
             <div class="reward-req">Needs: ${reqs}</div>
             ${suggestionLineHtml(reward)}
             <div class="reward-actions">${actions}</div>
@@ -453,6 +473,7 @@ function openRewardModal(rewardId) {
 
     $('reward-modal-title').textContent = reward ? 'Edit Reward' : 'New Reward';
     $('reward-name').value = reward ? reward.name : '';
+    $('reward-emoji').value = reward ? (reward.emoji || '') : '';
     $('reward-description').value = reward ? (reward.description || '') : '';
     $('reward-kind').value = reward ? reward.kind : 'standard';
     $('reward-allowance').value = reward ? reward.allowance_amount : 0;
@@ -491,11 +512,11 @@ function syncRewardFormKind() {
 }
 
 function populateReqHabits() {
-    const habits = trackedHabitsFor($('req-member').value);
+    const habits = linkableHabitsFor($('req-member').value);
     $('req-habit').innerHTML = habits.length
-        ? habits.map(h => `<option value="${h.id}">${escapeHtml(h.emoji || '')} ${escapeHtml(h.name)}</option>`).join('')
+        ? habits.map(h => `<option value="${h.id}">${escapeHtml(h.emoji || '')} ${escapeHtml(h.name)}${h.is_active === false ? ' (archived)' : ''}</option>`).join('')
         : '<option value="">No tasks for this person</option>';
-    if (habits.length) $('req-count').value = habitTarget(habits[0]);
+    if (habits.length) $('req-count').value = Math.max(1, habitTarget(habits[0]));
 }
 
 function renderRequirementList() {
@@ -527,6 +548,8 @@ function addRequirementFromForm() {
     }
     rewardFormError('');
     rewardDraftRequirements = extra ? [req] : [...rewardDraftRequirements, req];
+    // Borrow the linked task's emoji, unless the reward already has one
+    if (!$('reward-emoji').value.trim()) $('reward-emoji').value = fallbackRewardEmoji(rewardDraftRequirements);
     renderRequirementList();
 }
 
@@ -552,6 +575,7 @@ async function saveRewardFromModal(status) {
     const existing = editingRewardId ? rewardById(editingRewardId) : null;
     const payload = {
         name,
+        emoji: $('reward-emoji').value.trim() || fallbackRewardEmoji(rewardDraftRequirements),
         description: $('reward-description').value.trim() || null,
         kind,
         member_name: memberName,
@@ -648,7 +672,7 @@ function openAwardModal(awardId) {
 
     $('award-modal-title').textContent = award ? 'Edit Award' : 'Add Past Award';
     $('award-reward').innerHTML = rewards
-        .map(r => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
+        .map(r => `<option value="${r.id}">${escapeHtml(r.emoji || '🎁')} ${escapeHtml(r.name)}</option>`).join('');
     $('award-reward').value = award ? award.reward_id : (rewards[0] ? rewards[0].id : '');
     $('award-reward').disabled = !!award;
     $('award-earned').value = award ? award.earned_on : isoOf(new Date());
@@ -744,6 +768,6 @@ function initRewards() {
     $('req-member').addEventListener('change', populateReqHabits);
     $('req-habit').addEventListener('change', () => {
         const habit = allHabits.find(h => h.id === $('req-habit').value);
-        if (habit) $('req-count').value = habitTarget(habit);
+        if (habit) $('req-count').value = Math.max(1, habitTarget(habit));
     });
 }
