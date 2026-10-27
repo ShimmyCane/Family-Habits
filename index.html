@@ -1016,6 +1016,7 @@
         .reward-card { background: #fff; border: 3px solid var(--ink); border-radius: 20px; box-shadow: 4px 4px 0 var(--ink); padding: 14px 16px; margin-bottom: 14px; }
         .reward-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
         .reward-card-name { font-size: 18px; font-weight: 800; text-transform: uppercase; }
+        .reward-owner { font-size: 28px; line-height: 1; filter: drop-shadow(2px 2px 0 var(--ink)); margin-left: auto; }
         .reward-desc { font-family: 'Patrick Hand', cursive; font-size: 17px; color: #555; margin: 4px 0; }
         .reward-req { font-size: 13px; color: #555; margin-top: 4px; }
         .reward-suggest { font-size: 13px; color: #555; margin-top: 2px; }
@@ -1439,6 +1440,10 @@
                 <form id="reward-form" onsubmit="return false;">
                     <label for="reward-name">Name</label>
                     <input type="text" id="reward-name" placeholder="e.g. China buffet night" autocomplete="off">
+
+                    <label for="reward-emoji">Emoji</label>
+                    <input type="text" id="reward-emoji" maxlength="12" placeholder="Copied from the first task you link" autocomplete="off">
+                    <p class="reward-field-hint">Leave blank to borrow the emoji of the first task you link.</p>
 
                     <label for="reward-description">Description (optional)</label>
                     <textarea id="reward-description" rows="2" placeholder="Anything the kids should know"></textarea>
