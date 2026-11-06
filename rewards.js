@@ -86,24 +86,16 @@ function byEarnedDesc(a, b) {
 // ------------------------------------------------------------------------------
 // EVALUATION (reads loaded data, changes nothing)
 // ------------------------------------------------------------------------------
-// Tracked tasks only. Bonus tickets never count toward a family target.
-function trackedHabitsFor(memberName) {
-    return allHabits.filter(h => h.is_active !== false && h.member_name === memberName && h.type !== 'bonus');
-}
-
 function habitPeriodCount(habitId, start, end) {
     return allHabitCompletions.filter(c => c.habit_id === habitId && c.completed_date >= start && c.completed_date <= end).length;
 }
 
 // Percent of a member's weekly targets done in the period. Null when they have no tracked tasks.
+// Uses the same week scoring as the home page (task history and parent overrides).
+// The period is one week, starting on its Monday.
 function memberPeriodPercent(memberName, start, end) {
-    let done = 0;
-    let target = 0;
-    trackedHabitsFor(memberName).forEach(h => {
-        target += habitTarget(h);
-        done += habitPeriodCount(h.id, start, end);
-    });
-    return target > 0 ? Math.round((done / target) * 100) : null;
+    const score = scoreMemberWeek(memberName, start, habitId => habitPeriodCount(habitId, start, end));
+    return score.target > 0 || score.overridden ? score.percent : null;
 }
 
 function evaluateHabitRequirement(req, start, end) {
