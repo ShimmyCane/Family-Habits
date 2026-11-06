@@ -38,6 +38,8 @@ let allHabits = []; // all habits (both active and bank/inactive)
 let memberHabits = [];
 let allCompletions = [];
 let allBonusCompletions = []; // bonus completions from every week, for the all-time count
+let habitRevisions = []; // dated history of each habit (see habitsForWeek)
+let weekOverrides = []; // parent-confirmed weekly percents (see scoreMemberWeek)
 let currentWeeklyReflection = '';
 let soundEnabled = localStorage.getItem('soundEnabled') !== 'false';
 let gracePeriodDays = parseInt(localStorage.getItem('gracePeriodDays'), 10) || 14;
@@ -319,6 +321,22 @@ async function loadAllData() {
             allHabits = habitsData || [];
         }
 
+        // Load the dated history of each habit, and the weekly overrides.
+        // If these cannot load, weeks fall back to each habit's current values.
+        const [revResult, overrideResult] = await Promise.all([
+            _supabase.from('habit_revisions').select('*'),
+            _supabase.from('week_overrides').select('*')
+        ]);
+        if (revResult.error || overrideResult.error) {
+            console.warn('Week history not loaded:', (revResult.error || overrideResult.error).message);
+            showError('Could not load week history. Past weeks may show current targets.');
+            habitRevisions = [];
+            weekOverrides = [];
+        } else {
+            habitRevisions = revResult.data || [];
+            weekOverrides = overrideResult.data || [];
+        }
+
         // Load completions for the current week
         const { data: compData, error: compError } = await _supabase
             .from('habit_completions')
@@ -484,20 +502,100 @@ function habitTarget(habit) {
     return habit.target_count || (habit.target_frequency === 'daily' ? 7 : 3);
 }
 
-// Weekly score for one member. Every completion counts, including extra ones
-// (bonuses), so extra work on one task can make up for a shortfall on another.
-// The percent can go above 100. Bonus tickets are left out here: they are
-// tallied separately by memberBonus, so they never change the target or percent.
-function memberWeekScore(memberName) {
-    const memberHabitsList = allHabits.filter(h => h.is_active !== false && h.member_name === memberName && h.type !== 'bonus');
+// ------------------------------------------------------------------------------
+// WEEK HISTORY
+// A change to a task (target, owner, type, archive) is saved as a revision that
+// starts on the Monday after the change, so past weeks keep their old values.
+// A week is scored with the latest revision whose start is on or before that
+// Monday. A task with no revisions at all uses its current row (fallback).
+// ------------------------------------------------------------------------------
+function nextWeekStartIso() {
+    return shiftIsoDate(getWeekDates(0)[0].iso, 7);
+}
+
+// The task as it was in force during the week starting on weekStart, or null if
+// no revision had started by then (the task did not exist for that week).
+function effectiveHabit(habit, weekStart) {
+    const revs = habitRevisions.filter(r => r.habit_id === habit.id);
+    if (revs.length === 0) return habit;
+    let best = null;
+    revs.forEach(r => {
+        if (r.valid_from <= weekStart && (!best || r.valid_from > best.valid_from)) best = r;
+    });
+    if (!best) return null;
+    return {
+        ...habit,
+        member_name: best.member_name,
+        type: best.type,
+        target_frequency: best.target_frequency,
+        target_count: best.target_count,
+        is_active: best.is_active
+    };
+}
+
+// Active tasks for one member in the given week, as they were that week.
+function habitsForWeek(memberName, weekStart) {
+    return allHabits
+        .map(h => effectiveHabit(h, weekStart))
+        .filter(h => h && h.is_active !== false && h.member_name === memberName);
+}
+
+// Saves a change to one task. It starts on the next Monday, so the current week
+// and every past week are unchanged. state holds the task's values after the change.
+async function saveHabitRevision(habitId, state) {
+    const row = {
+        habit_id: habitId,
+        valid_from: nextWeekStartIso(),
+        member_name: state.member_name,
+        type: state.type,
+        target_frequency: state.target_frequency,
+        target_count: state.type === 'bonus' ? 0 : state.target_count,
+        is_active: state.is_active !== false
+    };
+    habitRevisions = habitRevisions.filter(r => !(r.habit_id === habitId && r.valid_from === row.valid_from));
+    habitRevisions.push(row);
+    const { error } = await _supabase.from('habit_revisions').upsert(row, { onConflict: 'habit_id,valid_from' });
+    if (error) {
+        showError('Could not save the change history: ' + error.message);
+    }
+}
+
+// Parent-confirmed percent for one member and week, or null when there is none.
+function weekOverrideFor(memberName, weekStart) {
+    const row = weekOverrides.find(o => o.member_name === memberName && o.week_start === weekStart);
+    return row ? row.percent : null;
+}
+
+// Weekly score for one member in the week starting on weekStart. doneFor(habitId)
+// gives the completions for that task in the week. Every completion counts,
+// including extra ones (bonuses), so extra work on one task can make up for a
+// shortfall on another, and the percent can go above 100. Bonus tickets are left
+// out: they are tallied separately by memberBonus. A parent override replaces
+// the percent but the done/target counts stay the same.
+function scoreMemberWeek(memberName, weekStart, doneFor) {
     let done = 0;
     let target = 0;
-    memberHabitsList.forEach(habit => {
+    habitsForWeek(memberName, weekStart).forEach(habit => {
+        if (habit.type === 'bonus') return;
         target += habitTarget(habit);
-        done += allCompletions.filter(c => c.habit_id === habit.id).length;
+        done += doneFor(habit.id);
     });
-    const percent = target > 0 ? Math.round((done / target) * 100) : 0;
-    return { done, target, percent };
+    const override = weekOverrideFor(memberName, weekStart);
+    const calculated = target > 0 ? Math.round((done / target) * 100) : 0;
+    return {
+        done,
+        target,
+        percent: override !== null ? override : calculated,
+        overridden: override !== null
+    };
+}
+
+// Weekly score for the week currently on screen.
+function memberWeekScore(memberName) {
+    const weekStart = getWeekDates(weekOffset)[0].iso;
+    return scoreMemberWeek(memberName, weekStart, habitId =>
+        allCompletions.filter(c => c.habit_id === habitId).length
+    );
 }
 
 // Bonus tickets for one member: count this week and all time.
@@ -521,7 +619,7 @@ function renderHomeView() {
     container.innerHTML = '';
 
     familyMembers.forEach(member => {
-        const { done, target, percent } = memberWeekScore(member.name);
+        const { done, target, percent, overridden } = memberWeekScore(member.name);
         const bonus = memberBonus(member.name);
         const badges = calculateMemberBadges(member.name);
 
@@ -538,7 +636,7 @@ function renderHomeView() {
             <div class="progress-bar-container">
                 <div class="progress-bar-fill" style="width:${Math.min(percent, 100)}%; background-color:${member.color || 'var(--mint)'};"></div>
             </div>
-            <div class="card-stat-text">${done}/${target} done (${percent}%)${bonus.week > 0 ? ` · ⭐ ${bonus.week} bonus` : ''}</div>
+            <div class="card-stat-text">${done}/${target} done (${percent}%)${overridden ? ' · set by parent' : ''}${bonus.week > 0 ? ` · ⭐ ${bonus.week} bonus` : ''}</div>
         `;
 
         card.addEventListener('click', () => {
@@ -867,7 +965,7 @@ async function handleHabitFormSubmit(e) {
         memberHabits = allHabits.filter(h => h.is_active !== false && h.member_name === currentMember);
         renderHabitLists();
         $('add-modal').style.display = 'none';
-        showToast('✨ Task updated!');
+        showToast('✨ Task updated! Changes start next week.');
 
         try {
             const { error } = await _supabase
@@ -878,6 +976,9 @@ async function handleHabitFormSubmit(e) {
             if (error) {
                 showError('Failed to update task: ' + error.message);
                 loadAllData();
+            } else {
+                const current = allHabits.find(h => h.id === editId);
+                await saveHabitRevision(editId, { ...updateData, is_active: current ? current.is_active !== false : true });
             }
         } catch (e) {
             showError('Network error updating task: ' + e.message);
@@ -899,8 +1000,11 @@ async function handleHabitFormSubmit(e) {
             if (error) {
                 showError('Failed to add task: ' + error.message);
             } else {
-                showToast('✨ Task created successfully!');
-                if (data && data[0]) allHabits.push(data[0]);
+                showToast('✨ Task created successfully! It starts next week.');
+                if (data && data[0]) {
+                    allHabits.push(data[0]);
+                    await saveHabitRevision(data[0].id, newHabit);
+                }
                 $('new-habit-form').reset();
                 $('add-modal').style.display = 'none';
 
@@ -955,6 +1059,8 @@ async function confirmArchiveHabit() {
         if (error) {
             showError('Failed to archive task: ' + error.message);
             loadAllData();
+        } else if (habit) {
+            await saveHabitRevision(habitId, { ...habit, is_active: false });
         }
     } catch (e) {
         showError('Archive error: ' + e.message);
@@ -1220,6 +1326,7 @@ async function assignTaskFromBank(task, targetMember) {
                     emoji: task.emoji
                 })
                 .eq('id', existingInactive.id);
+            await saveHabitRevision(existingInactive.id, { ...existingInactive, is_active: true });
         } catch (e) {
             console.warn('DB error reactivating habit:', e);
         }
@@ -1243,6 +1350,7 @@ async function assignTaskFromBank(task, targetMember) {
 
             if (data && data[0]) {
                 allHabits.push(data[0]);
+                await saveHabitRevision(data[0].id, newHabit);
             } else {
                 newHabit.id = 'local_' + Date.now();
                 allHabits.push(newHabit);
@@ -1361,8 +1469,9 @@ function shiftIsoDate(iso, days) {
 // Builds the sequence of scenes for one person: intro, tally, up to three highlights, encouragement.
 function buildReelScenes(member) {
     const currentStart = getWeekDates(weekOffset)[0].iso;
-    const memberHabitsList = allHabits.filter(h => h.is_active !== false && h.member_name === member.name && h.type !== 'bonus');
-    const hasTasks = allHabits.some(h => h.is_active !== false && h.member_name === member.name);
+    const weekHabits = habitsForWeek(member.name, currentStart);
+    const memberHabitsList = weekHabits.filter(h => h.type !== 'bonus');
+    const hasTasks = weekHabits.length > 0;
 
     const rows = memberHabitsList.map(habit => {
         const done = allCompletions.filter(c => c.habit_id === habit.id).length;
@@ -1630,8 +1739,9 @@ function showComparisonBoard() {
     const breakdownContainer = $('breakdown-list');
     breakdownContainer.innerHTML = '';
 
+    const breakdownWeekStart = getWeekDates(weekOffset)[0].iso;
     familyMembers.forEach(member => {
-        const mHabits = allHabits.filter(h => h.is_active !== false && h.member_name === member.name);
+        const mHabits = habitsForWeek(member.name, breakdownWeekStart);
         if (mHabits.length === 0) return;
 
         const card = document.createElement('div');
@@ -1728,8 +1838,9 @@ function triggerFridgePrint() {
 
     const tbody = $('print-table-body');
 
+    const printWeekStart = getWeekDates(weekOffset)[0].iso;
     familyMembers.forEach(member => {
-        const mHabits = allHabits.filter(h => h.is_active !== false && h.member_name === member.name);
+        const mHabits = habitsForWeek(member.name, printWeekStart);
 
         const mHeader = document.createElement('tr');
         mHeader.innerHTML = `<td colspan="10" class="print-member-header">${member.avatar} ${member.name} (${member.role})</td>`;
