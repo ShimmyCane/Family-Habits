@@ -97,6 +97,10 @@
     <p class="muted">Newest first. <span class="badge live">Live</span> means checked on the live site or database. <span class="badge merged">Merged</span> means on main but not fully checked. <span class="badge notes">Notes</span> means tracked in the AI notes only.</p>
     <div id="versions"></div>
 
+    <h2>🧭 Lessons learned</h2>
+    <p class="muted">What we would do differently on the Family Habits work, so the next change starts from them.</p>
+    <div id="lessons"></div>
+
     <footer>
         Merged history on GitHub:
         <a href="https://github.com/ShimmyCane/Family-Habits/commits/main" target="_blank" rel="noopener">Family-Habits commits</a>.
@@ -180,6 +184,19 @@
         });
     }
 
+    function renderLessons(data) {
+        const box = $('lessons');
+        box.textContent = '';
+        const items = data.lessons || [];
+        if (!items.length) { box.appendChild(el('div', 'card muted', 'Nothing recorded yet.')); return; }
+        items.forEach((text, i) => {
+            const card = el('div', 'card');
+            card.appendChild(el('div', 'ver', String(i + 1)));
+            card.appendChild(el('p', 'summary', text));
+            box.appendChild(card);
+        });
+    }
+
     function fail(message) {
         const strip = $('status');
         strip.textContent = '';
@@ -188,7 +205,7 @@
 
     fetch('changelog.json', { cache: 'no-store' })
         .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .then((data) => { renderStatus(data); renderTodo(data); renderVersions(data); })
+        .then((data) => { renderStatus(data); renderTodo(data); renderVersions(data); renderLessons(data); })
         .catch((e) => fail('Could not load changelog.json (' + e.message + '). Open this page from the live site, not from a file on disk.'));
 })();
 </script>
