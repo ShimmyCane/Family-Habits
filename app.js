@@ -38,8 +38,10 @@ let allHabits = []; // all habits (both active and bank/inactive)
 let memberHabits = [];
 let allCompletions = [];
 let allBonusCompletions = []; // bonus completions from every week, for the all-time count
-let habitRevisions = []; // dated history of each habit (see habitsForWeek)
+let habitRevisions = []; // dated history of each habit (see weekTasks)
 let weekOverrides = []; // parent-confirmed weekly percents (see scoreMemberWeek)
+let weekSnapshots = []; // locked per-task records of finished weeks (see lockFinishedWeeks)
+let snapshotsLoaded = false; // true only if the snapshot table loaded, so locking is safe
 let currentWeeklyReflection = '';
 let soundEnabled = localStorage.getItem('soundEnabled') !== 'false';
 let gracePeriodDays = parseInt(localStorage.getItem('gracePeriodDays'), 10) || 14;
@@ -323,12 +325,14 @@ async function loadAllData() {
 
         // Load the dated history of each habit, and the weekly overrides.
         // If these cannot load, weeks fall back to each habit's current values.
-        const [revResult, overrideResult] = await Promise.all([
+        const [revResult, overrideResult, snapResult] = await Promise.all([
             _supabase.from('habit_revisions').select('*'),
-            _supabase.from('week_overrides').select('*')
+            _supabase.from('week_overrides').select('*'),
+            _supabase.from('week_task_snapshots').select('*')
         ]);
-        if (revResult.error || overrideResult.error) {
-            console.warn('Week history not loaded:', (revResult.error || overrideResult.error).message);
+        const weekError = revResult.error || overrideResult.error;
+        if (weekError) {
+            console.warn('Week history not loaded:', weekError.message);
             showError('Could not load week history. Past weeks may show current targets.');
             habitRevisions = [];
             weekOverrides = [];
@@ -336,6 +340,9 @@ async function loadAllData() {
             habitRevisions = revResult.data || [];
             weekOverrides = overrideResult.data || [];
         }
+        snapshotsLoaded = !snapResult.error;
+        weekSnapshots = snapshotsLoaded ? (snapResult.data || []) : [];
+        if (snapResult.error) console.warn('Weekly snapshots not loaded:', snapResult.error.message);
 
         // Load completions for the current week
         const { data: compData, error: compError } = await _supabase
@@ -378,6 +385,7 @@ async function loadAllData() {
         allBonusCompletions = [];
     }
 
+    await lockFinishedWeeks();
     await loadRewardData();
 
     // Active habits carry over indefinitely
@@ -533,11 +541,163 @@ function effectiveHabit(habit, weekStart) {
     };
 }
 
-// Active tasks for one member in the given week, as they were that week.
-function habitsForWeek(memberName, weekStart) {
-    return allHabits
-        .map(h => effectiveHabit(h, weekStart))
-        .filter(h => h && h.is_active !== false && h.member_name === memberName);
+// The tasks for one member in one week, as they were that week. A locked snapshot
+// row is used where one exists. Otherwise the task comes from its revision for
+// that week, and its completions are counted live (doneFor gives the count).
+function weekTasks(memberName, weekStart, doneFor) {
+    const snapById = new Map(
+        weekSnapshots
+            .filter(s => s.week_start === weekStart && s.member_name === memberName)
+            .map(s => [s.habit_id, s])
+    );
+    const rows = [];
+    allHabits.forEach(h => {
+        if (snapById.has(h.id)) {
+            rows.push(snapshotRow(snapById.get(h.id)));
+            snapById.delete(h.id);
+            return;
+        }
+        const eff = effectiveHabit(h, weekStart);
+        if (eff && eff.is_active !== false && eff.member_name === memberName) {
+            rows.push({
+                id: h.id,
+                name: eff.name,
+                emoji: eff.emoji,
+                type: eff.type,
+                target_frequency: eff.target_frequency,
+                target: habitTarget(eff),
+                done: doneFor(h.id),
+                created_at: h.created_at
+            });
+        }
+    });
+    // Tasks deleted after their week was locked still count for that week
+    snapById.forEach(s => rows.push(snapshotRow(s)));
+    return rows;
+}
+
+function snapshotRow(s) {
+    return {
+        id: s.habit_id,
+        name: s.name,
+        emoji: s.emoji,
+        type: s.type,
+        target_frequency: s.target_frequency,
+        target: s.type === 'bonus' ? 0 : s.target,
+        done: s.done,
+        created_at: null
+    };
+}
+
+// The record saved for one task in one week (see lockFinishedWeeks).
+function snapshotRecord(habitId, weekStart, state, done) {
+    return {
+        habit_id: habitId,
+        week_start: weekStart,
+        member_name: state.member_name,
+        name: state.name,
+        emoji: state.emoji || '✨',
+        type: state.type,
+        target_frequency: state.target_frequency,
+        target: state.type === 'bonus' ? 0 : habitTarget(state),
+        done
+    };
+}
+
+// Monday of the week containing an ISO date.
+function weekStartOf(iso) {
+    const day = new Date(`${iso}T00:00:00Z`).getUTCDay();
+    return shiftIsoDate(iso, -((day + 6) % 7));
+}
+
+// Saves the finished weeks that have no snapshot yet. A week is finished once its
+// Sunday 11:30 pm (this device's time) has passed. Runs on load, so a week is
+// locked the first time the app is opened after that.
+async function lockFinishedWeeks() {
+    if (!snapshotsLoaded) return;
+    const now = new Date();
+    const thisWeek = getWeekDates(0)[0].iso;
+
+    const { data: compData, error: compError } = await _supabase
+        .from('habit_completions')
+        .select('habit_id, completed_date');
+    if (compError) {
+        console.warn('Could not load completions to lock weeks:', compError.message);
+        return;
+    }
+    const completions = compData || [];
+
+    let earliest = thisWeek;
+    allHabits.forEach(h => {
+        const d = (h.created_at || '').slice(0, 10);
+        if (d && d < earliest) earliest = d;
+    });
+    completions.forEach(c => {
+        if (c.completed_date < earliest) earliest = c.completed_date;
+    });
+
+    const newRows = [];
+    for (let week = weekStartOf(earliest); week <= thisWeek; week = shiftIsoDate(week, 7)) {
+        const weekEnd = shiftIsoDate(week, 6);
+        const [y, m, d] = weekEnd.split('-').map(Number);
+        if (now < new Date(y, m - 1, d, 23, 30)) continue; // not finished yet
+
+        allHabits.forEach(h => {
+            if (weekSnapshots.some(s => s.habit_id === h.id && s.week_start === week)) return;
+            const eff = effectiveHabit(h, week);
+            if (!eff || eff.is_active === false) return;
+            const done = completions.filter(c =>
+                c.habit_id === h.id && c.completed_date >= week && c.completed_date <= weekEnd
+            ).length;
+            newRows.push(snapshotRecord(h.id, week, eff, done));
+        });
+    }
+    if (newRows.length === 0) return;
+
+    const { error } = await _supabase
+        .from('week_task_snapshots')
+        .upsert(newRows, { onConflict: 'habit_id,week_start', ignoreDuplicates: true });
+    if (error) {
+        showError('Could not lock finished weeks: ' + error.message);
+        return;
+    }
+    weekSnapshots = weekSnapshots.concat(newRows);
+}
+
+// Before a task is deleted, its record for the current week is saved, so the
+// week's score does not change. Returns false if it could not be saved.
+async function keepTaskThisWeek(habit) {
+    if (!habit || !snapshotsLoaded) return true;
+    const weekStart = getWeekDates(0)[0].iso;
+    if (weekSnapshots.some(s => s.habit_id === habit.id && s.week_start === weekStart)) return true;
+    const eff = effectiveHabit(habit, weekStart);
+    if (!eff || eff.is_active === false) return true;
+
+    const weekEnd = shiftIsoDate(weekStart, 6);
+    const done = allHabitCompletions.filter(c =>
+        c.habit_id === habit.id && c.completed_date >= weekStart && c.completed_date <= weekEnd
+    ).length;
+    const row = snapshotRecord(habit.id, weekStart, eff, done);
+    const { error } = await _supabase
+        .from('week_task_snapshots')
+        .upsert([row], { onConflict: 'habit_id,week_start', ignoreDuplicates: true });
+    if (error) {
+        showError('Could not keep this week before deleting: ' + error.message);
+        return false;
+    }
+    weekSnapshots.push(row);
+    return true;
+}
+
+// All-time bonus count for one ticket. Weeks already locked count from their
+// snapshot, so later deleting the ticket does not change them.
+function bonusAllTime(habitId) {
+    const locked = weekSnapshots.filter(s => s.habit_id === habitId);
+    const lockedWeeks = new Set(locked.map(s => s.week_start));
+    const live = allBonusCompletions.filter(c =>
+        c.habit_id === habitId && !lockedWeeks.has(weekStartOf(c.completed_date))
+    ).length;
+    return live + locked.reduce((n, s) => n + s.done, 0);
 }
 
 // Saves a change to one task. It starts on the next Monday, so the current week
@@ -575,10 +735,10 @@ function weekOverrideFor(memberName, weekStart) {
 function scoreMemberWeek(memberName, weekStart, doneFor) {
     let done = 0;
     let target = 0;
-    habitsForWeek(memberName, weekStart).forEach(habit => {
-        if (habit.type === 'bonus') return;
-        target += habitTarget(habit);
-        done += doneFor(habit.id);
+    weekTasks(memberName, weekStart, doneFor).forEach(task => {
+        if (task.type === 'bonus') return;
+        target += task.target;
+        done += task.done;
     });
     const override = weekOverrideFor(memberName, weekStart);
     const calculated = target > 0 ? Math.round((done / target) * 100) : 0;
@@ -598,15 +758,19 @@ function memberWeekScore(memberName) {
     );
 }
 
-// Bonus tickets for one member: count this week and all time.
+// Bonus tickets for one member: count this week and all time. All-time keeps
+// tickets that were later deleted, through their locked weeks.
 function memberBonus(memberName) {
-    const ids = allHabits
-        .filter(h => h.is_active !== false && h.member_name === memberName && h.type === 'bonus')
-        .map(h => h.id);
-    return {
-        week: allCompletions.filter(c => ids.includes(c.habit_id)).length,
-        total: allBonusCompletions.filter(c => ids.includes(c.habit_id)).length
-    };
+    const weekStart = getWeekDates(weekOffset)[0].iso;
+    const weekBonus = weekTasks(memberName, weekStart, id => allCompletions.filter(c => c.habit_id === id).length)
+        .filter(t => t.type === 'bonus');
+    const ids = new Set([
+        ...allHabits.filter(h => h.member_name === memberName && h.type === 'bonus').map(h => h.id),
+        ...weekSnapshots.filter(s => s.member_name === memberName && s.type === 'bonus').map(s => s.habit_id)
+    ]);
+    let total = 0;
+    ids.forEach(id => { total += bonusAllTime(id); });
+    return { week: weekBonus.reduce((n, t) => n + t.done, 0), total };
 }
 
 function renderHomeView() {
@@ -1076,6 +1240,10 @@ async function confirmDeleteHabit() {
     const habitId = habitToDelete.id;
     $('delete-modal').style.display = 'none';
 
+    if (!(await keepTaskThisWeek(habitToDelete))) {
+        habitToDelete = null;
+        return;
+    }
     allHabits = allHabits.filter(h => h.id !== habitId);
     memberHabits = allHabits.filter(h => h.is_active !== false && h.member_name === currentMember);
     allCompletions = allCompletions.filter(c => c.habit_id !== habitId);
@@ -1397,6 +1565,9 @@ async function permanentlyDeleteCatalogTask(task) {
     }
 
     const idsToDelete = [...task.habitIds];
+    for (const h of allHabits.filter(x => idsToDelete.includes(x.id))) {
+        if (!(await keepTaskThisWeek(h))) return;
+    }
     allHabits = allHabits.filter(h => !idsToDelete.includes(h.id));
     allCompletions = allCompletions.filter(c => !idsToDelete.includes(c.habit_id));
     memberHabits = allHabits.filter(h => h.is_active !== false && h.member_name === currentMember);
@@ -1469,13 +1640,13 @@ function shiftIsoDate(iso, days) {
 // Builds the sequence of scenes for one person: intro, tally, up to three highlights, encouragement.
 function buildReelScenes(member) {
     const currentStart = getWeekDates(weekOffset)[0].iso;
-    const weekHabits = habitsForWeek(member.name, currentStart);
+    const weekHabits = weekTasks(member.name, currentStart, id => allCompletions.filter(c => c.habit_id === id).length);
     const memberHabitsList = weekHabits.filter(h => h.type !== 'bonus');
     const hasTasks = weekHabits.length > 0;
 
     const rows = memberHabitsList.map(habit => {
-        const done = allCompletions.filter(c => c.habit_id === habit.id).length;
-        const target = habitTarget(habit);
+        const done = habit.done;
+        const target = habit.target;
         const lastDone = reelPreviousCompletions
             ? reelPreviousCompletions.filter(c => c.habit_id === habit.id).length
             : null;
@@ -1543,9 +1714,9 @@ function buildReelScenes(member) {
 
     // Highlights: extra work first, then breakthroughs, then targets hit. Only habits with some progress.
     // Bonus tickets earned this week come first: they are rare, so they should be the highlight.
-    const bonusHighlights = allHabits
-        .filter(h => h.is_active !== false && h.member_name === member.name && h.type === 'bonus')
-        .map(h => ({ habit: h, count: allCompletions.filter(c => c.habit_id === h.id).length }))
+    const bonusHighlights = weekHabits
+        .filter(h => h.type === 'bonus')
+        .map(h => ({ habit: h, count: h.done }))
         .filter(b => b.count > 0)
         .map(b => ({
             row: { habit: b.habit, done: b.count, target: 0 },
@@ -1741,7 +1912,7 @@ function showComparisonBoard() {
 
     const breakdownWeekStart = getWeekDates(weekOffset)[0].iso;
     familyMembers.forEach(member => {
-        const mHabits = habitsForWeek(member.name, breakdownWeekStart);
+        const mHabits = weekTasks(member.name, breakdownWeekStart, id => allCompletions.filter(c => c.habit_id === id).length);
         if (mHabits.length === 0) return;
 
         const card = document.createElement('div');
@@ -1751,11 +1922,11 @@ function showComparisonBoard() {
 
         let habitsHtml = '';
         mHabits.forEach(h => {
-            const doneCount = allCompletions.filter(c => c.habit_id === h.id).length;
+            const doneCount = h.done;
             const badge = h.type === 'chore' ? '🧹 Chore' : h.type === 'bonus' ? '⭐ Bonus' : '🎯 Goal';
             const countText = h.type === 'bonus'
-                ? `${doneCount} this week · ${allBonusCompletions.filter(c => c.habit_id === h.id).length} all time`
-                : `${doneCount}/${habitTarget(h)} done`;
+                ? `${doneCount} this week · ${bonusAllTime(h.id)} all time`
+                : `${doneCount}/${h.target} done`;
             habitsHtml += `
                 <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed #ddd;">
                     <div>
@@ -1840,7 +2011,7 @@ function triggerFridgePrint() {
 
     const printWeekStart = getWeekDates(weekOffset)[0].iso;
     familyMembers.forEach(member => {
-        const mHabits = habitsForWeek(member.name, printWeekStart);
+        const mHabits = weekTasks(member.name, printWeekStart, id => allCompletions.filter(c => c.habit_id === id).length);
 
         const mHeader = document.createElement('tr');
         mHeader.innerHTML = `<td colspan="10" class="print-member-header">${member.avatar} ${member.name} (${member.role})</td>`;
@@ -1853,7 +2024,7 @@ function triggerFridgePrint() {
         } else {
             mHabits.forEach(h => {
                 const tr = document.createElement('tr');
-                const targetText = h.type === 'bonus' ? 'No target' : h.target_frequency === 'daily' ? 'Daily' : `${h.target_count}x/wk`;
+                const targetText = h.type === 'bonus' ? 'No target' : h.target_frequency === 'daily' ? 'Daily' : `${h.target}x/wk`;
                 const typeText = h.type === 'chore' ? '🧹 Chore' : h.type === 'bonus' ? '⭐ Bonus' : '🎯 Goal';
 
                 tr.innerHTML = `
