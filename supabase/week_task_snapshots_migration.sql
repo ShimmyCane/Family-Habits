@@ -46,17 +46,14 @@ insert into public.app_table_registry (app, object_name, object_type, access, de
 on conflict (app, object_name) do nothing;
 
 -- ----------------------------------------------------------------------------
--- NOT RUN YET: correct the start date of tasks created after their first week.
--- The revision seed used 2000-01-01 for every task, so a task counts in weeks
--- before it was created (for example, tasks added on Oct 18 count in the week
--- of Oct 12, and tasks added on Nov 1-4 count in the Oct 19 and Oct 26 weeks).
--- This moves each one to the week after it was created, which is the rule for
--- new tasks. It changes past scores for several members, so run it only after
--- deciding, and before the first lock.
+-- Start dates. The first revision of each task was seeded with 2000-01-01, so a
+-- task counted in weeks before it existed. Tracking started on 2026-10-01, so the
+-- earliest start is 2026-10-01, and a task starts the week after it was created.
+-- Runs once: it only touches rows still on the seed date.
 -- ----------------------------------------------------------------------------
--- update public.habit_revisions r
---    set valid_from = greatest(date '2000-01-01',
---                              (date_trunc('week', h.created_at at time zone 'America/Los_Angeles')::date + 7))
---   from public.habits h
---  where h.id = r.habit_id
---    and r.valid_from = date '2000-01-01';
+update public.habit_revisions r
+   set valid_from = greatest(date '2026-10-01',
+                             date_trunc('week', h.created_at at time zone 'America/Los_Angeles')::date + 7)
+  from public.habits h
+ where h.id = r.habit_id
+   and r.valid_from = date '2000-01-01';
