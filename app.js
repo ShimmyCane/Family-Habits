@@ -729,16 +729,16 @@ function weekOverrideFor(memberName, weekStart) {
 // Weekly score for one member in the week starting on weekStart. doneFor(habitId)
 // gives the completions for that task in the week. Every completion counts,
 // including extra ones (bonuses), so extra work on one task can make up for a
-// shortfall on another, and the percent can go above 100. Bonus tickets are left
-// out: they are tallied separately by memberBonus. A parent override replaces
-// the percent but the done/target counts stay the same.
+// shortfall on another, and the percent can go above 100. Bonus tickets add one
+// to done for each completion but never add to target, so they can lift the
+// percent without raising the bar. memberBonus still tallies them separately.
+// A parent override replaces the percent but the done/target counts stay the same.
 function scoreMemberWeek(memberName, weekStart, doneFor) {
     let done = 0;
     let target = 0;
     weekTasks(memberName, weekStart, doneFor).forEach(task => {
-        if (task.type === 'bonus') return;
-        target += task.target;
         done += task.done;
+        if (task.type !== 'bonus') target += task.target;
     });
     const override = weekOverrideFor(memberName, weekStart);
     const calculated = target > 0 ? Math.round((done / target) * 100) : 0;
@@ -1669,7 +1669,9 @@ function buildReelScenes(member) {
     const choresTotal = sum(choresRows, 'target');
     const goalsDone = sum(goalsRows, 'done');
     const goalsTotal = sum(goalsRows, 'target');
-    const totalDone = choresDone + goalsDone;
+    // Bonus completions count toward done but have no target, matching the home card score
+    const bonusDone = weekHabits.filter(h => h.type === 'bonus').reduce((total, h) => total + h.done, 0);
+    const totalDone = choresDone + goalsDone + bonusDone;
     const totalTarget = choresTotal + goalsTotal;
     const percent = totalTarget > 0 ? Math.round((totalDone / totalTarget) * 100) : 0;
     const allMet = rows.length > 0 && rows.every(r => r.met);
