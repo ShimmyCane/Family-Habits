@@ -342,6 +342,14 @@
       "title": "Locked weekly snapshots",
       "summary": "After Sunday 11:30 pm the app saves one insert-only record per task for that week, so deleting a task keeps its history. Bonus all-time counts keep deleted tickets. Scores, reel, breakdown and print read locked weeks from their records. Database step: supabase/week_task_snapshots_migration.sql (to-do T15); no locking happens until it runs. Family Habits PR #12.",
       "status": "merged"
+    },
+    {
+      "version": "1.27",
+      "date": "2026-11-08",
+      "project": "Family Habits",
+      "title": "Bonus tickets count toward the week",
+      "summary": "Each bonus completion now adds one to the weekly done count, so it can make up for a shortfall elsewhere. Bonus tickets still never add to the target, so the bar does not move. The reel's overall percent includes them too. No database step.",
+      "status": "merged"
     }
   ],
   "lessons": [
