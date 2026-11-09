@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-06",
+  "updated": "2026-11-09",
   "statuses": {
     "live": "Running on the live site or database, and checked.",
     "merged": "On main, but not fully checked. See the to-do list.",
@@ -350,6 +350,14 @@
       "title": "Bonus tickets count toward the week",
       "summary": "Each bonus completion now adds one to the weekly done count, so it can make up for a shortfall elsewhere. Bonus tickets still never add to the target, so the bar does not move. The reel's overall percent includes them too. No database step.",
       "status": "merged"
+    },
+    {
+      "version": "1.28",
+      "date": "2026-11-09",
+      "project": "Family Habits",
+      "title": "Animal avatars",
+      "summary": "New family icons: Athena is a puppy 🐶, Jimmy a tiger cub 🐯, Ying a girl calf 🐮🎀 and Felix a boy calf 🐮. Added to the avatar picker too. Database: family_members updated (supabase/animal_avatars.sql).",
+      "status": "live"
     }
   ],
   "lessons": [
