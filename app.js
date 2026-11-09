@@ -11,13 +11,13 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Default Family Members
 const DEFAULT_MEMBERS = [
-    { name: 'Athena', avatar: '🦄', color: '#ff6b9d', role: 'kid' },
-    { name: 'Felix',  avatar: '🦊', color: '#6bd8a0', role: 'kid' },
-    { name: 'Ying',   avatar: '🌸', color: '#ffd23f', role: 'parent' },
-    { name: 'Jimmy',  avatar: '☕', color: '#4cc9f0', role: 'parent' }
+    { name: 'Athena', avatar: '🐶', color: '#ff6b9d', role: 'kid' },
+    { name: 'Felix',  avatar: '🐮', color: '#6bd8a0', role: 'kid' },
+    { name: 'Ying',   avatar: '🐮🎀', color: '#ffd23f', role: 'parent' },
+    { name: 'Jimmy',  avatar: '🐯', color: '#4cc9f0', role: 'parent' }
 ];
 
-const AVATAR_OPTIONS = ['🦄', '🦊', '🌸', '☕', '🐼', '🦁', '🐯', '🚀', '🌟', '🎨', '⚽', '🎸', '👑', '🦖', '🍦'];
+const AVATAR_OPTIONS = ['🐶', '🐯', '🐮🎀', '🐮', '🦄', '🦊', '🌸', '☕', '🐼', '🦁', '🚀', '🌟', '🎨', '⚽', '🎸', '👑', '🦖', '🍦'];
 const COLOR_OPTIONS = ['#ff6b9d', '#6bd8a0', '#ffd23f', '#4cc9f0', '#9b5de5', '#ff7b54'];
 
 // Affirmations Data
@@ -48,7 +48,7 @@ let gracePeriodDays = parseInt(localStorage.getItem('gracePeriodDays'), 10) || 1
 let habitToDelete = null;
 
 // Profile Customization Staging State
-let selectedCustomAvatar = '🦄';
+let selectedCustomAvatar = '🐶';
 let selectedCustomColor = '#ff6b9d';
 
 // Celebration Reel State
