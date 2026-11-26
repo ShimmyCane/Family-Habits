@@ -50,5 +50,5 @@ The Task Bank is built from the `public.habits` table in the Supabase project **
 
 - Use Supabase MCP `execute_sql` on project `twvqvutrcobedvuhnzxq`. Don't touch the `xabgankckrcuhcgdolrg` (Architecture) project.
 - `habit_revisions` has no emoji column, so no revision entry is needed.
-- Use a single emoji per task. Compound emojis such as `🧹🏠` are allowed when already in use, but avoid making new ones.
+- Use one emoji for a short task name. For a sentence-style name, two or more emojis are fine (for example `✍️📖` for "Write one book report"). Compound emojis such as `🧹🏠` are also fine.
 - Keep emoji choices consistent with the task's meaning, and don't create duplicates.
